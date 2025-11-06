@@ -252,6 +252,61 @@ function generateHTML() {
       min-height: auto;
     }
   }
+  
+  /* Serving Size Adjuster */
+  .serving-adjuster {
+    background: #f8f9fa;
+    border: 2px solid #007BFF;
+    border-radius: 8px;
+    padding: 1em;
+    margin: 1em 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1em;
+  }
+  .serving-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 1em;
+  }
+  .serving-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+  }
+  .serving-btn {
+    background: #007BFF;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.3em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    font-weight: bold;
+  }
+  .serving-btn:hover, .serving-btn:active {
+    background: #0056b3;
+  }
+  .serving-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  .serving-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #007BFF;
+    min-width: 120px;
+    text-align: center;
+  }
+  
   #recipe-content {
     line-height: 1.6;
     word-wrap: break-word;
@@ -435,6 +490,10 @@ function loadRecipes() {
   content.appendChild(renderStructure(RECIPES_DATA.structure));
 }
 
+let currentServings = 1;
+let originalServings = 1;
+let originalIngredients = [];
+
 async function loadRecipe(path, title) {
   const recipeViewer = document.getElementById('recipe-viewer');
   const recipeContent = document.getElementById('recipe-content');
@@ -455,6 +514,9 @@ async function loadRecipe(path, title) {
     const markdown = await response.text();
     const html = marked.parse(markdown);
     recipeContent.innerHTML = html;
+    
+    // Initialize serving size adjuster
+    initializeServingAdjuster(markdown);
   } catch (error) {
     recipeContent.innerHTML = \`
       <div style="color: #c33; padding: 1em; background: #fee; border-radius: 4px;">
@@ -462,6 +524,176 @@ async function loadRecipe(path, title) {
       </div>
     \`;
   }
+}
+
+function parseServingSize(markdown) {
+  // Try to find serving size in various formats
+  const patterns = [
+    /(?:Yields?|Servings?|Serves?):\s*(\d+)\s*servings?/i,
+    /(?:Yields?|Servings?|Serves?):\s*(\d+)/i,
+    /(\d+)\s*servings?/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = markdown.match(pattern);
+    if (match) {
+      return parseInt(match[1]);
+    }
+  }
+  return 1; // Default to 1 if not found
+}
+
+function parseQuantity(text) {
+  // Parse fractions, decimals, ranges, and whole numbers
+  const fractionMap = {
+    '¼': 0.25, '½': 0.5, '¾': 0.75,
+    '⅓': 0.333, '⅔': 0.667,
+    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
+    '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8,
+    '1/4': 0.25, '1/2': 0.5, '3/4': 0.75,
+    '1/3': 0.333, '2/3': 0.667,
+    '1/8': 0.125, '3/8': 0.375, '5/8': 0.625, '7/8': 0.875
+  };
+  
+  // Match patterns like "2 1/2", "2.5", "2-3", etc.
+  const patterns = [
+    /^(\\d+)\\s+([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\\d+\\/\\d+)/, // e.g., "2 1/2"
+    /^([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\\d+\\/\\d+)/, // e.g., "1/2"
+    /^(\\d+\\.\\d+)/, // e.g., "2.5"
+    /^(\\d+)-(\\d+)/, // e.g., "2-3" (range)
+    /^(\\d+)/ // e.g., "2"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      if (match[2]) {
+        // Whole number + fraction (e.g., "2 1/2")
+        const whole = parseInt(match[1]);
+        const fraction = fractionMap[match[2]] || eval(match[2]);
+        return whole + fraction;
+      } else if (match[1].includes('-')) {
+        // Range (e.g., "2-3") - use average
+        const [min, max] = match[0].split('-').map(Number);
+        return (min + max) / 2;
+      } else if (fractionMap[match[1]]) {
+        // Just a fraction
+        return fractionMap[match[1]];
+      } else if (match[1].includes('/')) {
+        // Fraction like "1/4"
+        return eval(match[1]);
+      } else {
+        // Regular number
+        return parseFloat(match[1]);
+      }
+    }
+  }
+  return null;
+}
+
+function formatQuantity(num) {
+  if (num === null) return '';
+  
+  // Round to 2 decimal places
+  num = Math.round(num * 100) / 100;
+  
+  // Convert to fraction if close to common fractions
+  const fractions = [
+    [0.125, '⅛'], [0.25, '¼'], [0.333, '⅓'], [0.375, '⅜'],
+    [0.5, '½'], [0.625, '⅝'], [0.667, '⅔'], [0.75, '¾'], [0.875, '⅞']
+  ];
+  
+  const whole = Math.floor(num);
+  const decimal = num - whole;
+  
+  for (const [val, frac] of fractions) {
+    if (Math.abs(decimal - val) < 0.05) {
+      return whole > 0 ? \`\${whole} \${frac}\` : frac;
+    }
+  }
+  
+  return num % 1 === 0 ? num.toString() : num.toFixed(1);
+}
+
+function scaleIngredients(scale) {
+  const content = document.getElementById('recipe-content');
+  const items = content.querySelectorAll('li');
+  
+  items.forEach((item, index) => {
+    const original = originalIngredients[index];
+    if (!original) return;
+    
+    const quantity = parseQuantity(original);
+    if (quantity !== null) {
+      const scaled = quantity * scale;
+      const formatted = formatQuantity(scaled);
+      
+      // Replace the quantity in the text
+      const quantityRegex = /^[\\d\\.\\s¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘\\/\\-]+/;
+      item.textContent = item.textContent.replace(quantityRegex, formatted + ' ');
+    }
+  });
+}
+
+function initializeServingAdjuster(markdown) {
+  const content = document.getElementById('recipe-content');
+  
+  // Parse original serving size
+  originalServings = parseServingSize(markdown);
+  currentServings = originalServings;
+  
+  // Store original ingredient text
+  originalIngredients = [];
+  const items = content.querySelectorAll('li');
+  items.forEach(item => {
+    originalIngredients.push(item.textContent);
+  });
+  
+  // Create serving adjuster UI
+  const adjuster = document.createElement('div');
+  adjuster.className = 'serving-adjuster';
+  adjuster.innerHTML = \`
+    <div class="serving-label">Adjust Servings:</div>
+    <div class="serving-controls">
+      <button class="serving-btn" id="decrease-serving" aria-label="Decrease servings">−</button>
+      <div class="serving-value" id="serving-display">\${currentServings} serving\${currentServings !== 1 ? 's' : ''}</div>
+      <button class="serving-btn" id="increase-serving" aria-label="Increase servings">+</button>
+    </div>
+  \`;
+  
+  // Insert after the first heading or at the start
+  const firstHeading = content.querySelector('h2, h3');
+  if (firstHeading) {
+    firstHeading.parentNode.insertBefore(adjuster, firstHeading);
+  } else {
+    content.insertBefore(adjuster, content.firstChild);
+  }
+  
+  // Add event listeners
+  document.getElementById('decrease-serving').addEventListener('click', () => {
+    if (currentServings > 1) {
+      currentServings -= 1;
+      updateServings();
+    }
+  });
+  
+  document.getElementById('increase-serving').addEventListener('click', () => {
+    if (currentServings < 99) {
+      currentServings += 1;
+      updateServings();
+    }
+  });
+}
+
+function updateServings() {
+  const scale = currentServings / originalServings;
+  const display = document.getElementById('serving-display');
+  const decreaseBtn = document.getElementById('decrease-serving');
+  
+  display.textContent = \`\${currentServings} serving\${currentServings !== 1 ? 's' : ''}\`;
+  decreaseBtn.disabled = currentServings <= 1;
+  
+  scaleIngredients(scale);
 }
 
 function showRecipeList() {

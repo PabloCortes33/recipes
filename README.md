@@ -7,6 +7,7 @@ A dynamic recipe browser that displays your markdown recipes in an organized, ea
 - 📱 **Mobile-First Design** - Fully responsive, optimized for iPhone and all devices
 - 📁 **Collapsible Folders** - Organized by language (English/Spanish) and category
 - 📖 **Markdown Viewer** - Read recipes directly in the browser with beautiful formatting
+- ⚖️ **Dynamic Serving Adjustment** - Automatically scale ingredient quantities for any serving size
 - 🔄 **Easy Updates** - Just run one script to regenerate everything
 - ⚡ **Progressive Web App** - Install on your home screen like a native app
 - 🚀 **Offline Support** - Access your recipes even without internet (after first visit)
@@ -51,6 +52,25 @@ Then open http://localhost:8000 in your browser.
 5. Your site will be available at `https://yourusername.github.io/recipes`
 
 **On iPhone:** Visit the site in Safari, tap the Share button, then "Add to Home Screen". Your recipe app will work like a native app with offline support!
+
+### Dynamic Serving Adjustment
+
+The recipe viewer automatically detects serving sizes and provides +/- buttons to scale all ingredient quantities:
+
+**Supported formats:**
+- Whole numbers: `2 cups` → `4 cups`
+- Fractions: `½ teaspoon` → `1 teaspoon`
+- Mixed numbers: `2 ½ cups` → `5 cups`
+- Decimals: `1.5 tablespoons` → `3 tablespoons`
+- Ranges: `2-3 cloves` → `4-6 cloves` (uses midpoint)
+
+**How it works:**
+1. Add `Yields: X servings` or `Serves: X` to your recipe
+2. Start ingredient lines with quantities
+3. The adjuster appears automatically when you view the recipe
+4. Click +/- to scale all ingredients proportionally
+
+No special markup needed - just write your recipes naturally!
 
 ## Project Structure
 
