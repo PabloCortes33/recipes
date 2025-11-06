@@ -57,6 +57,7 @@ function generateHTML() {
 <html>
 <head>
 <title>Recipes</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { 
@@ -135,6 +136,7 @@ function generateHTML() {
     display: block;
     border-radius: 4px;
     transition: background 0.2s;
+    cursor: pointer;
   }
   .file a:hover {
     background: #e3f2fd;
@@ -145,6 +147,91 @@ function generateHTML() {
     font-size: 0.8em;
     margin-top: 2em;
   }
+  .hidden {
+    display: none;
+  }
+  
+  /* Recipe Viewer Styles */
+  #recipe-viewer {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    padding: 2em;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #recipe-viewer.hidden {
+    display: none;
+  }
+  .back-button {
+    background: #007BFF;
+    color: white;
+    border: none;
+    padding: 0.5em 1em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin-bottom: 1em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .back-button:hover {
+    background: #0056b3;
+  }
+  #recipe-content {
+    line-height: 1.6;
+  }
+  #recipe-content h1 {
+    color: #333;
+    border-bottom: 3px solid #007BFF;
+    padding-bottom: 0.5em;
+  }
+  #recipe-content h2 {
+    color: #555;
+    margin-top: 1.5em;
+  }
+  #recipe-content h3 {
+    color: #666;
+  }
+  #recipe-content code {
+    background: #f5f5f5;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+  }
+  #recipe-content pre {
+    background: #f5f5f5;
+    padding: 1em;
+    border-radius: 4px;
+    overflow-x: auto;
+  }
+  #recipe-content pre code {
+    background: none;
+    padding: 0;
+  }
+  #recipe-content ul, #recipe-content ol {
+    padding-left: 2em;
+  }
+  #recipe-content li {
+    margin: 0.5em 0;
+  }
+  #recipe-content blockquote {
+    border-left: 4px solid #007BFF;
+    padding-left: 1em;
+    margin-left: 0;
+    color: #666;
+  }
+  #recipe-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  .loading-message {
+    text-align: center;
+    padding: 2em;
+    color: #666;
+  }
 </style>
 </head>
 <body>
@@ -152,8 +239,14 @@ function generateHTML() {
   <h1>🍳 Recipes Collection</h1>
   <div class="subtitle">Browse recipes organized by language and category</div>
 </div>
-<div id="content"></div>
-<div class="timestamp">Last updated: ${new Date(manifest.generated).toLocaleString()}</div>
+<div id="recipe-list">
+  <div id="content"></div>
+  <div class="timestamp">Last updated: ${new Date(manifest.generated).toLocaleString()}</div>
+</div>
+<div id="recipe-viewer" class="hidden">
+  <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
+  <div id="recipe-content"></div>
+</div>
 
 <script>
 const RECIPES_DATA = ${JSON.stringify(manifest, null, 2)};
@@ -205,8 +298,12 @@ function createFileElement(item) {
   file.className = 'file';
   
   const link = document.createElement('a');
-  link.href = item.path;
+  link.href = '#';
   link.textContent = formatName(item.name);
+  link.onclick = (e) => {
+    e.preventDefault();
+    loadRecipe(item.path, formatName(item.name));
+  };
   
   file.appendChild(link);
   return file;
@@ -249,6 +346,44 @@ function renderStructure(structure) {
 function loadRecipes() {
   const content = document.getElementById('content');
   content.appendChild(renderStructure(RECIPES_DATA.structure));
+}
+
+async function loadRecipe(path, title) {
+  const recipeViewer = document.getElementById('recipe-viewer');
+  const recipeContent = document.getElementById('recipe-content');
+  const recipeList = document.getElementById('recipe-list');
+  
+  // Show loading message
+  recipeContent.innerHTML = '<div class="loading-message">Loading recipe...</div>';
+  recipeList.classList.add('hidden');
+  recipeViewer.classList.remove('hidden');
+  
+  // Scroll to top
+  window.scrollTo(0, 0);
+  
+  try {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error('Failed to load recipe');
+    
+    const markdown = await response.text();
+    const html = marked.parse(markdown);
+    recipeContent.innerHTML = html;
+  } catch (error) {
+    recipeContent.innerHTML = \`
+      <div style="color: #c33; padding: 1em; background: #fee; border-radius: 4px;">
+        ⚠️ Failed to load recipe. Please try again.
+      </div>
+    \`;
+  }
+}
+
+function showRecipeList() {
+  const recipeViewer = document.getElementById('recipe-viewer');
+  const recipeList = document.getElementById('recipe-list');
+  
+  recipeViewer.classList.add('hidden');
+  recipeList.classList.remove('hidden');
+  window.scrollTo(0, 0);
 }
 
 loadRecipes();
