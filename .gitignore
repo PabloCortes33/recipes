@@ -1,0 +1,9 @@
+# Playwright MCP temporary files
+.playwright-mcp/
+
+# macOS
+.DS_Store
+
+# Node modules (if added in the future)
+node_modules/
+
