@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="description" content="Personal recipes collection organized by language and category">
+<meta name="theme-color" content="#007BFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Recipes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>Recipes</title>
 <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 <style>
@@ -8,39 +18,68 @@
   body { 
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
     margin: 0;
-    padding: 2em; 
+    padding: 1em; 
     background: #f5f5f5;
+  }
+  @media (min-width: 768px) {
+    body { padding: 2em; }
   }
   .header {
     max-width: 1200px;
-    margin: 0 auto 2em;
+    margin: 0 auto 1.5em;
+  }
+  @media (min-width: 768px) {
+    .header { margin-bottom: 2em; }
   }
   h1 { 
     color: #333; 
     margin: 0 0 0.5em 0;
+    font-size: 1.8em;
+  }
+  @media (min-width: 768px) {
+    h1 { font-size: 2.5em; }
   }
   .subtitle {
     color: #666;
-    font-size: 0.9em;
+    font-size: 0.85em;
+  }
+  @media (min-width: 768px) {
+    .subtitle { font-size: 0.9em; }
   }
   .container { 
     display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-    gap: 2em; 
+    grid-template-columns: 1fr;
+    gap: 1.5em; 
     max-width: 1200px;
     margin: 0 auto;
   }
+  @media (min-width: 768px) {
+    .container { 
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2em;
+    }
+  }
   .language-section {
     background: white;
-    padding: 1.5em;
+    padding: 1em;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
+  @media (min-width: 768px) {
+    .language-section { padding: 1.5em; }
+  }
   h2 { 
     color: #333; 
-    margin: 0 0 1em 0;
+    margin: 0 0 0.8em 0;
     padding-bottom: 0.5em;
     border-bottom: 2px solid #007BFF;
+    font-size: 1.3em;
+  }
+  @media (min-width: 768px) {
+    h2 { 
+      font-size: 1.5em;
+      margin-bottom: 1em;
+    }
   }
   .folder {
     margin: 0.5em 0;
@@ -49,15 +88,25 @@
     font-weight: bold;
     color: #555;
     cursor: pointer;
-    padding: 0.5em;
+    padding: 0.6em 0.5em;
     background: #f9f9f9;
     border-radius: 4px;
     user-select: none;
     display: flex;
     align-items: center;
+    font-size: 0.95em;
+    -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    min-height: 44px;
   }
-  .folder-name:hover {
+  .folder-name:hover, .folder-name:active {
     background: #f0f0f0;
+  }
+  @media (min-width: 768px) {
+    .folder-name {
+      padding: 0.5em;
+      font-size: 1em;
+      min-height: auto;
+    }
   }
   .folder-icon {
     margin-right: 0.5em;
@@ -77,14 +126,26 @@
   .file a {
     text-decoration: none;
     color: #007BFF;
-    padding: 0.3em 0.5em;
+    padding: 0.5em;
     display: block;
     border-radius: 4px;
     transition: background 0.2s;
     cursor: pointer;
+    font-size: 0.9em;
+    -webkit-tap-highlight-color: rgba(0,123,255,0.1);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
-  .file a:hover {
+  .file a:hover, .file a:active {
     background: #e3f2fd;
+  }
+  @media (min-width: 768px) {
+    .file a {
+      padding: 0.3em 0.5em;
+      font-size: 1em;
+      min-height: auto;
+    }
   }
   .timestamp {
     text-align: center;
@@ -101,9 +162,12 @@
     max-width: 900px;
     margin: 0 auto;
     background: white;
-    padding: 2em;
+    padding: 1em;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  @media (min-width: 768px) {
+    #recipe-viewer { padding: 2em; }
   }
   #recipe-viewer.hidden {
     display: none;
@@ -112,7 +176,7 @@
     background: #007BFF;
     color: white;
     border: none;
-    padding: 0.5em 1em;
+    padding: 0.7em 1.2em;
     border-radius: 4px;
     cursor: pointer;
     font-size: 1em;
@@ -120,24 +184,47 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 44px;
   }
-  .back-button:hover {
+  .back-button:hover, .back-button:active {
     background: #0056b3;
+  }
+  @media (min-width: 768px) {
+    .back-button {
+      padding: 0.5em 1em;
+      min-height: auto;
+    }
   }
   #recipe-content {
     line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   #recipe-content h1 {
     color: #333;
     border-bottom: 3px solid #007BFF;
     padding-bottom: 0.5em;
+    font-size: 1.6em;
+  }
+  @media (min-width: 768px) {
+    #recipe-content h1 { font-size: 2em; }
   }
   #recipe-content h2 {
     color: #555;
     margin-top: 1.5em;
+    font-size: 1.3em;
+  }
+  @media (min-width: 768px) {
+    #recipe-content h2 { font-size: 1.5em; }
   }
   #recipe-content h3 {
     color: #666;
+    font-size: 1.1em;
+  }
+  @media (min-width: 768px) {
+    #recipe-content h3 { font-size: 1.2em; }
   }
   #recipe-content code {
     background: #f5f5f5;
@@ -186,7 +273,7 @@
 </div>
 <div id="recipe-list">
   <div id="content"></div>
-  <div class="timestamp">Last updated: 11/6/2025, 7:03:16 PM</div>
+  <div class="timestamp">Last updated: 11/6/2025, 7:13:48 PM</div>
 </div>
 <div id="recipe-viewer" class="hidden">
   <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
@@ -195,7 +282,7 @@
 
 <script>
 const RECIPES_DATA = {
-  "generated": "2025-11-06T22:03:16.564Z",
+  "generated": "2025-11-06T22:13:48.885Z",
   "structure": [
     {
       "name": "english",
@@ -520,6 +607,11 @@ const RECIPES_DATA = {
           ]
         }
       ]
+    },
+    {
+      "name": "README",
+      "type": "file",
+      "path": "README.md"
     }
   ]
 };
@@ -660,6 +752,15 @@ function showRecipeList() {
 }
 
 loadRecipes();
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('Service Worker registered'))
+      .catch(err => console.log('Service Worker registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>
