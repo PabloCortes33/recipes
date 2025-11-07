@@ -1,0 +1,14 @@
+# Server Configuration
+PORT=3000
+AUTH_PASSWORD=your-secure-password-here
+
+# Anthropic API
+ANTHROPIC_API_KEY=sk-ant-api03-xxx
+
+# GitHub Configuration  
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxx
+GITHUB_REPO=origin
+
+# Repository Path (on Railway, this will point to the persistent volume)
+REPO_PATH=/app/recipes
+

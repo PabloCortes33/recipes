@@ -4,6 +4,14 @@
 # macOS
 .DS_Store
 
-# Node modules (if added in the future)
+# Node modules
 node_modules/
+
+# Environment variables
+.env
+server/.env
+
+# Logs
+*.log
+npm-debug.log*
 

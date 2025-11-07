@@ -1,6 +1,11 @@
 # 🍳 Recipes Collection
 
-A dynamic recipe browser that displays your markdown recipes in an organized, easy-to-navigate web interface. Works as a Progressive Web App (PWA) on mobile devices!
+A complete AI-powered recipe management system with both a static PWA for viewing recipes and a server application for AI-powered generation and management.
+
+## Two Components
+
+1. **Static PWA** (GitHub Pages) - View recipes, adjust servings, brainstorm ideas
+2. **Server App** (Railway) - Generate recipes with AI, manage git workflow
 
 ## Features
 
@@ -118,6 +123,40 @@ Improve your recipes with Claude's help using the simple clipboard workflow:
 
 **No API keys needed!** This uses the simple clipboard approach - you're in full control of what changes to accept.
 
+### Server-Based AI Generation (NEW!)
+
+For a more integrated experience, you can deploy the server application that fully automates the workflow:
+
+**Features:**
+- 🌐 **Web Interface** - Generate recipes from anywhere
+- 🤖 **Full AI Integration** - Automated research and generation
+- 🔄 **Git Automation** - Auto-commit and push to GitHub
+- 🌍 **Bilingual** - Generates both English and Spanish versions automatically
+- 📱 **Mobile-Friendly** - Use from your phone
+
+**Quick Start:**
+```bash
+cd server
+npm install
+# Configure .env with your API keys
+npm start
+```
+
+**Deploy to Railway:**
+See `server/DEPLOYMENT.md` for complete deployment guide.
+
+**Workflow:**
+1. Open server web UI (e.g., `https://your-app.railway.app`)
+2. Enter optional research query (e.g., "Italian carbonara techniques")
+3. Enter recipe generation prompt
+4. AI researches, generates English + Spanish recipes
+5. Review and click "Save & Commit"
+6. Click "Push to GitHub"
+7. Recipes automatically available on GitHub Pages
+8. Pull to your local machine with `git pull`
+
+This server acts as your "recipe generation computer in the cloud" - you can generate recipes from anywhere and they sync via GitHub!
+
 ## Project Structure
 
 ```
@@ -134,6 +173,12 @@ recipes/
 │   ├── recipes/
 │   ├── sauces/
 │   └── spices/
+├── server/              # Server application (NEW!)
+│   ├── server.js        # Main server
+│   ├── package.json     # Dependencies
+│   ├── public/          # Web UI
+│   ├── DEPLOYMENT.md    # Railway deployment guide
+│   └── README.md        # Server documentation
 ├── index.html           # Generated recipe browser (PWA)
 ├── manifest.json        # PWA manifest (generated)
 ├── service-worker.js    # Offline support (generated)

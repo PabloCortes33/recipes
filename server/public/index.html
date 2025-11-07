@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 2em;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 0.5em;
+            border-bottom: 3px solid #007BFF;
+            padding-bottom: 0.5em;
+        }
+        
+        .auth-section, .main-section {
+            margin-top: 2em;
+        }
+        
+        .hidden { display: none; }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="password"],
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 0.8em;
+            border: 2px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 1em;
+            font-family: inherit;
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #007BFF;
+        }
+        
+        .btn {
+            padding: 0.8em 1.5em;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-right: 0.5em;
+            margin-top: 1em;
+        }
+        
+        .btn-primary {
+            background: #007BFF;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .status {
+            padding: 1em;
+            margin-top: 1em;
+            border-radius: 4px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .recipe-preview {
+            background: #f8f9fa;
+            padding: 1.5em;
+            margin-top: 1.5em;
+            border-radius: 4px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .recipe-preview h3 {
+            color: #007BFF;
+            margin-bottom: 1em;
+        }
+        
+        .recipe-preview pre {
+            background: white;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2em;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007BFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .git-status {
+            background: #f8f9fa;
+            padding: 1em;
+            border-radius: 4px;
+            margin-top: 1em;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍳 AI Recipe Generator</h1>
+        
+        <!-- Authentication Section -->
+        <div id="auth-section" class="auth-section">
+            <div class="form-group">
+                <label for="auth-password">Enter Password:</label>
+                <input type="password" id="auth-password" placeholder="Your server password">
+            </div>
+            <button class="btn btn-primary" onclick="authenticate()">Login</button>
+            <div id="auth-status"></div>
+        </div>
+        
+        <!-- Main Application -->
+        <div id="main-section" class="main-section hidden">
+            
+            <!-- Recipe Generation Form -->
+            <div class="form-group">
+                <label for="research-query">Research Query (optional):</label>
+                <input type="text" id="research-query" placeholder="e.g., 'Italian carbonara sauce techniques'">
+                <small style="color: #666;">Leave empty to skip research phase</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="recipe-prompt">Recipe Generation Prompt:</label>
+                <textarea id="recipe-prompt" placeholder="Example: Create a recipe for Turkish Çılbır with a modern twist using sriracha instead of Aleppo pepper. Include poaching techniques and tips for perfect eggs."></textarea>
+            </div>
+            
+            <button class="btn btn-primary" onclick="generateRecipe()" id="generate-btn">
+                🤖 Generate Recipe
+            </button>
+            
+            <div id="generation-status"></div>
+            
+            <!-- Recipe Preview -->
+            <div id="recipe-preview" class="hidden"></div>
+            
+            <!-- Git Operations -->
+            <div class="git-status hidden" id="git-controls">
+                <h3>Git Operations</h3>
+                <button class="btn btn-secondary" onclick="gitPull()">⬇️ Pull from GitHub</button>
+                <button class="btn btn-success" onclick="gitPush()">⬆️ Push to GitHub</button>
+                <button class="btn btn-secondary" onclick="gitStatus()">📊 Show Status</button>
+                <div id="git-status"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let authToken = '';
+        let currentRecipes = null;
+        
+        async function authenticate() {
+            const password = document.getElementById('auth-password').value;
+            authToken = password;
+            
+            try {
+                const response = await fetch('/api/health', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    document.getElementById('auth-section').classList.add('hidden');
+                    document.getElementById('main-section').classList.remove('hidden');
+                    showStatus('auth-status', 'Authenticated successfully!', 'success');
+                } else {
+                    showStatus('auth-status', 'Invalid password', 'error');
+                }
+            } catch (error) {
+                showStatus('auth-status', 'Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        async function generateRecipe() {
+            const researchQuery = document.getElementById('research-query').value;
+            const prompt = document.getElementById('recipe-prompt').value;
+            
+            if (!prompt) {
+                showStatus('generation-status', 'Please enter a recipe prompt', 'error');
+                return;
+            }
+            
+            showStatus('generation-status', 'Generating recipe... This may take a minute.', 'info');
+            document.getElementById('generate-btn').disabled = true;
+            document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>AI is creating your recipe...</p></div>';
+            document.getElementById('recipe-preview').classList.remove('hidden');
+            
+            try {
+                const response = await fetch('/api/generate-recipe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ prompt, researchQuery })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentRecipes = data.recipes;
+                    displayRecipePreview(data.recipes);
+                    showStatus('generation-status', 'Recipe generated successfully!', 'success');
+                    document.getElementById('git-controls').classList.remove('hidden');
+                } else {
+                    showStatus('generation-status', 'Failed to generate recipe', 'error');
+                    document.getElementById('recipe-preview').classList.add('hidden');
+                }
+            } catch (error) {
+                showStatus('generation-status', 'Error: ' + error.message, 'error');
+                document.getElementById('recipe-preview').classList.add('hidden');
+            } finally {
+                document.getElementById('generate-btn').disabled = false;
+            }
+        }
+        
+        function displayRecipePreview(recipes) {
+            const preview = document.getElementById('recipe-preview');
+            preview.innerHTML = `
+                <h3>Generated Recipes</h3>
+                <div style="margin-bottom: 2em;">
+                    <h4>🇬🇧 English: ${recipes.english.filename}</h4>
+                    <pre>${recipes.english.content}</pre>
+                </div>
+                <div>
+                    <h4>🇪🇸 Spanish: ${recipes.spanish.filename}</h4>
+                    <pre>${recipes.spanish.content}</pre>
+                </div>
+                <div style="margin-top: 1em;">
+                    <button class="btn btn-success" onclick="saveRecipe()">💾 Save & Commit</button>
+                </div>
+            `;
+        }
+        
+        async function saveRecipe() {
+            if (!currentRecipes) return;
+            
+            const commitMessage = prompt('Commit message:', `Add recipe: ${currentRecipes.english.filename}`);
+            if (!commitMessage) return;
+            
+            showStatus('generation-status', 'Saving and committing...', 'info');
+            
+            try {
+                const response = await fetch('/api/save-recipe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ recipes: currentRecipes, commitMessage })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('generation-status', 'Recipe saved and committed! Ready to push.', 'success');
+                } else {
+                    showStatus('generation-status', 'Failed to save recipe', 'error');
+                }
+            } catch (error) {
+                showStatus('generation-status', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function gitPush() {
+            showStatus('git-status', 'Pushing to GitHub...', 'info');
+            
+            try {
+                const response = await fetch('/api/git/push', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showStatus('git-status', data.success ? 'Pushed successfully!' : 'Push failed', data.success ? 'success' : 'error');
+            } catch (error) {
+                showStatus('git-status', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function gitPull() {
+            showStatus('git-status', 'Pulling from GitHub...', 'info');
+            
+            try {
+                const response = await fetch('/api/git/pull', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showStatus('git-status', data.success ? 'Pulled successfully!' : 'Pull failed', data.success ? 'success' : 'error');
+            } catch (error) {
+                showStatus('git-status', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function gitStatus() {
+            try {
+                const response = await fetch('/api/git/status', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    const status = data.status;
+                    const message = `
+                        Modified: ${status.modified.length}
+                        Created: ${status.created.length}
+                        Deleted: ${status.deleted.length}
+                        Ahead: ${status.ahead}, Behind: ${status.behind}
+                    `;
+                    showStatus('git-status', message, 'info');
+                }
+            } catch (error) {
+                showStatus('git-status', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
+
