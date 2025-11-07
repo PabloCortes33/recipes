@@ -27,7 +27,10 @@ git push origin main
 1. Go to [railway.app](https://railway.app) and click "New Project"
 2. Select "Deploy from GitHub repo"
 3. Choose your `recipes` repository
-4. Railway will auto-detect Node.js and deploy
+4. Railway will auto-detect Node.js from root `package.json`
+5. The `package.json` script will automatically install backend dependencies and start the server
+
+**Note**: The root `package.json` is configured to run the backend server automatically.
 
 ### Option B: Deploy with Railway CLI
 
@@ -58,8 +61,6 @@ GITHUB_TOKEN=ghp_your-token
 GITHUB_REPO=origin
 REPO_PATH=/app/repo
 ```
-
-**Important**: Set Root Directory to `backend` in Railway settings!
 
 **Security Note**: Use a strong password for `AUTH_PASSWORD`!
 
