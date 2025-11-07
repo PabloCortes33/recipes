@@ -121,10 +121,22 @@ git push origin main
 ## 📚 Documentation
 
 - **`/docs/QUICKSTART.md`** - Get started in 5 minutes
+- **`/docs/SECURITY.md`** - Security best practices (READ THIS!)
 - **`/docs/ARCHITECTURE.md`** - Complete system design
-- **`/docs/DEPLOYMENT.md`** - Deploy to GitHub Pages
-- **`/backend/README.md`** - Server documentation
-- **`/backend/DEPLOYMENT.md`** - Deploy to Railway
+- **`/docs/DEPLOYMENT.md`** - Deploy frontend to GitHub Pages
+- **`/docs/BACKEND_DEPLOYMENT.md`** - Deploy backend to Railway
+- **`/backend/README.md`** - Server API documentation
+
+## 🔒 Security Note
+
+**IMPORTANT**: This repository contains an `ENV_EXAMPLE.txt` file with placeholders only. 
+
+- ✅ **Safe to commit**: `ENV_EXAMPLE.txt` (placeholders)
+- ❌ **NEVER commit**: `.env` (real secrets)
+- 🔐 **For Railway**: Use environment variables in dashboard
+- 📖 **Read**: `docs/SECURITY.md` for complete security guide
+
+Your secrets are protected by `.gitignore` - just don't manually add `.env` to git!
 
 ## 🛠️ Tech Stack
 

@@ -1,16 +1,23 @@
+# ⚠️ IMPORTANT: This is an EXAMPLE file. Do NOT put real values here!
+# Copy this file to .env and add your real secrets there.
+# The .env file is gitignored and will never be committed.
+
 # Server Configuration
 PORT=3000
-AUTH_PASSWORD=your-secure-password-here
+AUTH_PASSWORD=choose-a-strong-password-here
 
 # Anthropic API
-ANTHROPIC_API_KEY=sk-ant-api03-xxx
+# Get your key from: https://console.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE
 
-# GitHub Configuration  
-GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxx
+# GitHub Personal Access Token
+# Create at: GitHub Settings → Developer settings → Personal access tokens
+# Required scope: repo
+GITHUB_TOKEN=ghp_YOUR_TOKEN_HERE
 GITHUB_REPO=origin
 
-# Repository Path (on Railway, this will point to the persistent volume)
-# On Railway: /app/repo
-# Locally: /Users/pablocortes/Desktop/recipes
-REPO_PATH=/Users/pablocortes/Desktop/recipes
+# Repository Path
+# On Railway with volume: /app/repo
+# Locally for testing: /Users/YOUR_USERNAME/Desktop/recipes
+REPO_PATH=/Users/YOUR_USERNAME/Desktop/recipes
 

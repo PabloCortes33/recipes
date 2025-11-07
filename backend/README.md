@@ -14,20 +14,24 @@ A Node.js server that enables AI-powered recipe generation with automatic git in
 ## Quick Start (Local Development)
 
 ```bash
-# Install dependencies
-cd server
+cd backend
+
+# Run setup script (creates .env and guides you through configuration)
+./setup.sh
+
+# OR manually:
+# cp ENV_EXAMPLE.txt .env
+# nano .env  # Add your real API keys
+
+# Install and start
 npm install
-
-# Create .env file (copy from ENV_EXAMPLE.txt)
-cp ENV_EXAMPLE.txt .env
-# Edit .env with your API keys
-
-# Start server
-npm run dev
+npm start
 
 # Open browser
 open http://localhost:3000
 ```
+
+**🔒 Security**: Your `.env` file is automatically gitignored. Never commit secrets!
 
 ## API Endpoints
 

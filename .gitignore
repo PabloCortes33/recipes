@@ -7,9 +7,10 @@
 # Node modules
 node_modules/
 
-# Environment variables
+# Environment variables - NEVER COMMIT THESE!
 .env
-server/.env
+backend/.env
+**/.env
 
 # Logs
 *.log

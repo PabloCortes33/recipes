@@ -23,22 +23,18 @@ Get your AI recipe server running in 5 minutes!
 ```bash
 cd /Users/pablocortes/Desktop/recipes/backend
 
-# Install dependencies
-npm install
+# Run the setup script (creates .env and helps you configure it)
+./setup.sh
 
-# Create .env file
-cat > .env << 'EOF'
-PORT=3000
-AUTH_PASSWORD=my-secret-password
-ANTHROPIC_API_KEY=sk-ant-api03-YOUR-KEY-HERE
-GITHUB_TOKEN=ghp_YOUR-TOKEN-HERE
-GITHUB_REPO=origin
-REPO_PATH=/Users/pablocortes/Desktop/recipes
-EOF
-
-# Edit .env and add your real keys
-nano .env  # or use your favorite editor
+# Or do it manually:
+# cp ENV_EXAMPLE.txt .env
+# nano .env  # Edit with your real API keys
 ```
+
+**⚠️ IMPORTANT**: 
+- The `.env` file is gitignored and will NEVER be committed
+- `ENV_EXAMPLE.txt` only has placeholders (safe to commit)
+- NEVER put real secrets in `ENV_EXAMPLE.txt`
 
 ### 3. Start the Server
 
