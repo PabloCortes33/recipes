@@ -10,7 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuration
-const REPO_PATH = process.env.REPO_PATH || path.join(__dirname, '../');
+const REPO_PATH = process.env.REPO_PATH || path.join(__dirname, '..');
+const RECIPES_PATH = path.join(REPO_PATH, 'recipes');
+const FRONTEND_PATH = path.join(REPO_PATH, 'frontend');
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'change-me-please';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -91,8 +93,8 @@ app.post('/api/generate-recipe', authMiddleware, async (req, res) => {
       messages: [{
         role: 'user',
         content: `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe:
-1. English version (save as english/recipes/[recipe_name].md)
-2. Spanish version (save as spanish/recipes/[recipe_name].md)
+1. English version (save as recipes/english/recipes/[recipe_name].md)
+2. Spanish version (save as recipes/spanish/recipes/[recipe_name].md)
 
 For each version:
 - Use proper markdown format
@@ -148,12 +150,12 @@ Spanish: [filename].md`
         english: {
           content: englishRecipe,
           filename: englishFilename,
-          path: `english/recipes/${englishFilename}`
+          path: `recipes/english/recipes/${englishFilename}`
         },
         spanish: {
           content: spanishRecipe,
           filename: spanishFilename,
-          path: `spanish/recipes/${spanishFilename}`
+          path: `recipes/spanish/recipes/${spanishFilename}`
         }
       },
       researchContext: researchContext || null
@@ -190,7 +192,7 @@ app.post('/api/save-recipe', authMiddleware, async (req, res) => {
     // Regenerate index
     const { exec } = require('child_process');
     await new Promise((resolve, reject) => {
-      exec('node generate_manifest.js', { cwd: REPO_PATH }, (error, stdout, stderr) => {
+      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error, stdout, stderr) => {
         if (error) reject(error);
         else resolve(stdout);
       });
@@ -200,8 +202,8 @@ app.post('/api/save-recipe', authMiddleware, async (req, res) => {
     await git.add([
       recipes.english.path,
       recipes.spanish.path,
-      'index.html',
-      'service-worker.js'
+      'frontend/index.html',
+      'frontend/service-worker.js'
     ]);
 
     const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
@@ -293,8 +295,8 @@ app.get('/api/git/status', authMiddleware, async (req, res) => {
 // List recipes
 app.get('/api/recipes', authMiddleware, async (req, res) => {
   try {
-    const englishRecipes = await fs.readdir(path.join(REPO_PATH, 'english/recipes'));
-    const spanishRecipes = await fs.readdir(path.join(REPO_PATH, 'spanish/recipes'));
+    const englishRecipes = await fs.readdir(path.join(RECIPES_PATH, 'english/recipes'));
+    const spanishRecipes = await fs.readdir(path.join(RECIPES_PATH, 'spanish/recipes'));
 
     res.json({
       success: true,
@@ -317,6 +319,8 @@ app.get('/api/recipes', authMiddleware, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🍳 Recipe Server running on port ${PORT}`);
   console.log(`📝 Repository path: ${REPO_PATH}`);
+  console.log(`📚 Recipes path: ${RECIPES_PATH}`);
+  console.log(`🎨 Frontend path: ${FRONTEND_PATH}`);
   console.log(`🔑 Anthropic API: ${ANTHROPIC_API_KEY ? 'Configured' : 'Not configured'}`);
   console.log(`🐙 GitHub Token: ${GITHUB_TOKEN ? 'Configured' : 'Not configured'}`);
 });

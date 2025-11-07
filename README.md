@@ -1,200 +1,188 @@
 # 🍳 Recipes Collection
 
-A complete AI-powered recipe management system with both a static PWA for viewing recipes and a server application for AI-powered generation and management.
+A complete AI-powered recipe management system with a clean, organized architecture.
 
-## Two Components
-
-1. **Static PWA** (GitHub Pages) - View recipes, adjust servings, brainstorm ideas
-2. **Server App** (Railway) - Generate recipes with AI, manage git workflow
-
-## Features
-
-- 📱 **Mobile-First Design** - Fully responsive, optimized for iPhone and all devices
-- 📁 **Collapsible Folders** - Organized by language (English/Spanish) and category
-- 📖 **Markdown Viewer** - Read recipes directly in the browser with beautiful formatting
-- ⚖️ **Dynamic Serving Adjustment** - Automatically scale ingredient quantities for any serving size
-- 💡 **Recipe Ideas Brainstorming** - Jot down ideas on your phone, auto-saves locally, copy to paste into Claude/AI
-- 🤖 **AI-Powered Refactoring** - One-click to copy recipe + prompt to Claude for improvements
-- 🔄 **Easy Updates** - Just run one script to regenerate everything
-- ⚡ **Progressive Web App** - Install on your home screen like a native app
-- 🚀 **Offline Support** - Access your recipes even without internet (after first visit)
-
-## How to Use
-
-### Adding New Recipes
-
-1. Add your markdown files to the appropriate folder:
-   - `english/recipes/` or `spanish/recipes/`
-   - `english/methods/` or `spanish/methods/`
-   - etc.
-
-2. Regenerate the index:
-   ```bash
-   node generate_manifest.js
-   ```
-
-3. Commit and push:
-   ```bash
-   git add index.html
-   git commit -m "Add new recipes"
-   git push origin main
-   ```
-
-### Viewing Locally
-
-To test your recipes locally, you need a web server (due to browser security restrictions):
-
-```bash
-./start_server.sh
-```
-
-Then open http://localhost:8000 in your browser.
-
-### Deploy to GitHub Pages (Recommended)
-
-1. Push your code to GitHub
-2. Go to your repository Settings → Pages
-3. Under "Source", select your `main` branch
-4. Click Save
-5. Your site will be available at `https://yourusername.github.io/recipes`
-
-**On iPhone:** Visit the site in Safari, tap the Share button, then "Add to Home Screen". Your recipe app will work like a native app with offline support!
-
-### Dynamic Serving Adjustment
-
-The recipe viewer automatically detects serving sizes and provides +/- buttons to scale all ingredient quantities:
-
-**Supported formats:**
-- Whole numbers: `2 cups` → `4 cups`
-- Fractions: `½ teaspoon` → `1 teaspoon`
-- Mixed numbers: `2 ½ cups` → `5 cups`
-- Decimals: `1.5 tablespoons` → `3 tablespoons`
-- Ranges: `2-3 cloves` → `4-6 cloves` (uses midpoint)
-
-**How it works:**
-1. Add `Yields: X servings` or `Serves: X` to your recipe
-2. Start ingredient lines with quantities
-3. The adjuster appears automatically when you view the recipe
-4. Click +/- to scale all ingredients proportionally
-
-No special markup needed - just write your recipes naturally!
-
-### Recipe Ideas Brainstorming
-
-Keep track of recipe ideas while you're on the go:
-
-**Features:**
-- 💾 **Auto-saves** - Your ideas are saved to your device as you type
-- 📋 **One-tap copy** - Copy all ideas to paste into Claude or your AI assistant
-- 🗑️ **Easy to clear** - Start fresh when needed
-- 📱 **Mobile-friendly** - Perfect for jotting down ideas on your phone
-
-**Workflow:**
-1. On your phone: Click "💡 Recipe Ideas" button
-2. Write down recipe ideas as they come to you
-3. Ideas save automatically to your device
-4. Later on your computer: Click "💡 Recipe Ideas"
-5. Click "📋 Copy All" to copy everything
-6. Paste into Claude or your local AI tool to develop the recipe
-7. Add the finished recipe to your markdown files!
-
-This is perfect for capturing inspiration while cooking, at the grocery store, or eating at restaurants!
-
-### AI-Powered Recipe Refactoring
-
-Improve your recipes with Claude's help using the simple clipboard workflow:
-
-**How it works:**
-1. Open any recipe in the viewer
-2. Click "🤖 Refactor with AI" button
-3. The recipe markdown + a detailed prompt copies to your clipboard
-4. Paste into Claude (or your local AI tool)
-5. Claude suggests improvements while maintaining your recipe's format
-6. Copy the improved version
-7. Update your local `.md` file
-8. Run `node generate_manifest.js` and push!
-
-**What Claude will improve:**
-- Clarity of instructions
-- Cooking techniques and tips
-- Measurement accuracy
-- Flow and organization
-- Grammar and typos
-
-**No API keys needed!** This uses the simple clipboard approach - you're in full control of what changes to accept.
-
-### Server-Based AI Generation (NEW!)
-
-For a more integrated experience, you can deploy the server application that fully automates the workflow:
-
-**Features:**
-- 🌐 **Web Interface** - Generate recipes from anywhere
-- 🤖 **Full AI Integration** - Automated research and generation
-- 🔄 **Git Automation** - Auto-commit and push to GitHub
-- 🌍 **Bilingual** - Generates both English and Spanish versions automatically
-- 📱 **Mobile-Friendly** - Use from your phone
-
-**Quick Start:**
-```bash
-cd server
-npm install
-# Configure .env with your API keys
-npm start
-```
-
-**Deploy to Railway:**
-See `server/DEPLOYMENT.md` for complete deployment guide.
-
-**Workflow:**
-1. Open server web UI (e.g., `https://your-app.railway.app`)
-2. Enter optional research query (e.g., "Italian carbonara techniques")
-3. Enter recipe generation prompt
-4. AI researches, generates English + Spanish recipes
-5. Review and click "Save & Commit"
-6. Click "Push to GitHub"
-7. Recipes automatically available on GitHub Pages
-8. Pull to your local machine with `git pull`
-
-This server acts as your "recipe generation computer in the cloud" - you can generate recipes from anywhere and they sync via GitHub!
-
-## Project Structure
+## 📁 Directory Structure
 
 ```
 recipes/
-├── english/             # English recipes
-│   ├── bakery/
-│   ├── methods/
-│   ├── recipes/
-│   ├── sauces/
-│   └── spices/
-├── spanish/             # Spanish recipes
-│   ├── bakery/
-│   ├── methods/
-│   ├── recipes/
-│   ├── sauces/
-│   └── spices/
-├── server/              # Server application (NEW!)
-│   ├── server.js        # Main server
-│   ├── package.json     # Dependencies
-│   ├── public/          # Web UI
-│   ├── DEPLOYMENT.md    # Railway deployment guide
-│   └── README.md        # Server documentation
-├── index.html           # Generated recipe browser (PWA)
-├── manifest.json        # PWA manifest (generated)
-├── service-worker.js    # Offline support (generated)
-├── icon.svg             # App icon (generated)
-├── generate_manifest.js # Script to regenerate all files
-└── start_server.sh      # Local development server
+├── recipes/           # 📚 All recipe markdown files (English & Spanish)
+│   ├── english/
+│   └── spanish/
+│
+├── frontend/          # 🎨 Static PWA (GitHub Pages)
+│   ├── index.html
+│   ├── generate_manifest.js
+│   └── ...
+│
+├── backend/           # ⚙️ Server + AI (Railway)
+│   ├── server.js
+│   ├── package.json
+│   └── public/
+│
+├── docs/              # 📖 Documentation
+│   ├── ARCHITECTURE.md
+│   ├── DEPLOYMENT.md
+│   └── QUICKSTART.md
+│
+└── .claude/           # 🤖 AI agents for local development
+    └── agents/
 ```
 
-## Technologies
+## 🚀 Quick Start
 
-- **Vanilla JavaScript** - No frameworks, fast and simple
-- [Marked.js](https://marked.js.org/) - Markdown parsing
-- **Progressive Web App (PWA)** - Installable, offline-capable
-- **Service Workers** - Caching and offline support
-- **Responsive CSS** - Mobile-first design with media queries
-- **GitHub Pages** - Free hosting with custom domain support
+### View Recipes (No Setup)
 
-No build tools required - just run the generator script and push to GitHub!
+Visit: **https://pablocortes33.github.io/recipes** (once deployed)
 
+Or locally:
+```bash
+cd frontend
+./start_server.sh
+# Open http://localhost:8000
+```
+
+### Generate Recipes with AI
+
+See `backend/README.md` and `docs/QUICKSTART.md`
+
+## ✨ Features
+
+### Static PWA (Frontend)
+- 📱 Mobile-first responsive design
+- 📁 Collapsible folder navigation
+- 📖 Beautiful markdown rendering
+- ⚖️ Dynamic serving size adjustment
+- 💡 Recipe ideas brainstorming
+- 🤖 AI refactoring helper
+- ⚡ PWA installable on home screen
+- 🚀 Offline support
+
+### Server Application (Backend)
+- 🌐 Web UI for recipe generation
+- 🤖 Claude API integration
+- 🔬 Automated research phase
+- 🌍 Bilingual generation (English + Spanish)
+- 🔄 Git automation (commit & push)
+- 🔒 Simple password auth
+- 📱 Mobile-friendly interface
+
+## 🔄 Workflows
+
+### 1. Generate New Recipe (From Anywhere)
+
+```
+Open backend URL → Authenticate
+↓
+Enter research query (optional)
+↓
+Enter recipe idea
+↓
+AI generates English + Spanish versions
+↓
+Review → Save & Commit → Push
+↓
+Live on GitHub Pages in 1-2 minutes!
+```
+
+### 2. Browse & Use Recipes (Phone/Tablet)
+
+```
+Visit frontend URL
+↓
+Browse folders → Click recipe
+↓
+Adjust servings as needed
+↓
+Cook! 🍳
+```
+
+### 3. Brainstorm Ideas (Mobile)
+
+```
+Click "💡 Recipe Ideas"
+↓
+Jot down ideas (auto-saves)
+↓
+Later: Copy All → Paste into AI
+↓
+Develop into full recipes
+```
+
+### 4. Sync with Local Computer
+
+```
+git pull origin main
+# Edit recipes locally
+git push origin main
+# Server can pull to sync
+```
+
+## 📚 Documentation
+
+- **`/docs/QUICKSTART.md`** - Get started in 5 minutes
+- **`/docs/ARCHITECTURE.md`** - Complete system design
+- **`/docs/DEPLOYMENT.md`** - Deploy to GitHub Pages
+- **`/backend/README.md`** - Server documentation
+- **`/backend/DEPLOYMENT.md`** - Deploy to Railway
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- Vanilla JavaScript
+- Marked.js (markdown rendering)
+- Service Workers (offline support)
+
+**Backend:**
+- Node.js + Express
+- Anthropic SDK (Claude API)
+- simple-git (git operations)
+
+**Hosting:**
+- Frontend: GitHub Pages (free)
+- Backend: Railway.app ($0-3/month)
+- Sync: GitHub (version control)
+
+## 💰 Cost
+
+- **Frontend hosting**: FREE (GitHub Pages)
+- **Backend hosting**: ~$2-3/month (Railway free tier)
+- **AI generation**: ~$0.05-0.10 per recipe (Anthropic API)
+
+**Total**: Basically free for personal use!
+
+## 🎯 Adding New Recipes
+
+### Method 1: Via Server (Automated)
+1. Use backend web UI
+2. AI generates recipes
+3. Auto-commits and pushes
+
+### Method 2: Manual
+1. Create `.md` file in `recipes/english/recipes/`
+2. Create Spanish version in `recipes/spanish/recipes/`
+3. Run `cd frontend && node generate_manifest.js`
+4. Commit and push
+
+### Method 3: Local with AI
+1. Use Claude CLI with agents in `.claude/`
+2. Generate recipes locally
+3. Save to `recipes/` folder
+4. Regenerate and push
+
+## 🌟 Key Benefits
+
+- ✅ Clean, organized structure
+- ✅ Separation of concerns (frontend/backend/data)
+- ✅ AI-powered generation
+- ✅ Works offline (PWA)
+- ✅ Mobile-optimized
+- ✅ Free (or nearly free) hosting
+- ✅ Version control
+- ✅ Sync across devices
+
+## 📖 Learn More
+
+Read the full architecture guide: `docs/ARCHITECTURE.md`
+
+Happy cooking! 🍳

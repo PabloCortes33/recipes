@@ -10,5 +10,7 @@ GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxx
 GITHUB_REPO=origin
 
 # Repository Path (on Railway, this will point to the persistent volume)
-REPO_PATH=/app/recipes
+# On Railway: /app/repo
+# Locally: /Users/pablocortes/Desktop/recipes
+REPO_PATH=/Users/pablocortes/Desktop/recipes
 

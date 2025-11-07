@@ -1,4 +1,57 @@
-<!DOCTYPE html>
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+function scanDirectory(dirPath, basePath = '') {
+  const items = [];
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    // Skip hidden files and system folders
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+      continue;
+    }
+
+    const fullPath = path.join(dirPath, entry.name);
+    const relativePath = path.join(basePath, entry.name);
+
+    if (entry.isDirectory()) {
+      const children = scanDirectory(fullPath, relativePath);
+      items.push({
+        name: entry.name,
+        type: 'folder',
+        path: relativePath,
+        children: children
+      });
+    } else if (entry.name.endsWith('.md')) {
+      items.push({
+        name: entry.name.replace('.md', ''),
+        type: 'file',
+        path: relativePath
+      });
+    }
+  }
+
+  return items.sort((a, b) => {
+    // Folders first, then alphabetically
+    if (a.type === 'folder' && b.type !== 'folder') return -1;
+    if (a.type !== 'folder' && b.type === 'folder') return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function generateHTML() {
+  const rootDir = path.join(__dirname, '..');
+  const recipesDir = path.join(rootDir, 'recipes');
+  const structure = scanDirectory(recipesDir, 'recipes');
+  
+  const manifest = {
+    generated: new Date().toISOString(),
+    structure: structure
+  };
+
+  const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -505,7 +558,7 @@
 </div>
 <div id="recipe-list">
   <div id="content"></div>
-  <div class="timestamp">Last updated: 11/7/2025, 8:52:11 AM</div>
+  <div class="timestamp">Last updated: ${new Date(manifest.generated).toLocaleString()}</div>
 </div>
 <div id="recipe-viewer" class="hidden">
   <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
@@ -541,345 +594,7 @@ Your ideas are automatically saved to this device."
 </div>
 
 <script>
-const RECIPES_DATA = {
-  "generated": "2025-11-07T11:52:11.622Z",
-  "structure": [
-    {
-      "name": "english",
-      "type": "folder",
-      "path": "english",
-      "children": [
-        {
-          "name": "bakery",
-          "type": "folder",
-          "path": "english/bakery",
-          "children": [
-            {
-              "name": "banana_bread",
-              "type": "file",
-              "path": "english/bakery/banana_bread.md"
-            }
-          ]
-        },
-        {
-          "name": "methods",
-          "type": "folder",
-          "path": "english/methods",
-          "children": [
-            {
-              "name": "air_fryer_sweet_potato_cubes",
-              "type": "file",
-              "path": "english/methods/air_fryer_sweet_potato_cubes.md"
-            },
-            {
-              "name": "air_fryer_sweet_potato_fries",
-              "type": "file",
-              "path": "english/methods/air_fryer_sweet_potato_fries.md"
-            },
-            {
-              "name": "air_fryer_sweet_potato_wedges",
-              "type": "file",
-              "path": "english/methods/air_fryer_sweet_potato_wedges.md"
-            },
-            {
-              "name": "air_fryer_whole_baked_sweet_potato",
-              "type": "file",
-              "path": "english/methods/air_fryer_whole_baked_sweet_potato.md"
-            },
-            {
-              "name": "chicago_deep_dish_pizza_sauce",
-              "type": "file",
-              "path": "english/methods/chicago_deep_dish_pizza_sauce.md"
-            },
-            {
-              "name": "detroit_style_pizza_sauce",
-              "type": "file",
-              "path": "english/methods/detroit_style_pizza_sauce.md"
-            },
-            {
-              "name": "neapolitan_pizza_sauce",
-              "type": "file",
-              "path": "english/methods/neapolitan_pizza_sauce.md"
-            },
-            {
-              "name": "new_york_pizza_sauce",
-              "type": "file",
-              "path": "english/methods/new_york_pizza_sauce.md"
-            },
-            {
-              "name": "pizza_sauce_techniques",
-              "type": "file",
-              "path": "english/methods/pizza_sauce_techniques.md"
-            },
-            {
-              "name": "poached_eggs_tips",
-              "type": "file",
-              "path": "english/methods/poached_eggs_tips.md"
-            },
-            {
-              "name": "roasted_tomato_sauce",
-              "type": "file",
-              "path": "english/methods/roasted_tomato_sauce.md"
-            },
-            {
-              "name": "tzatziki_sauce_techniques",
-              "type": "file",
-              "path": "english/methods/tzatziki_sauce_techniques.md"
-            }
-          ]
-        },
-        {
-          "name": "recipes",
-          "type": "folder",
-          "path": "english/recipes",
-          "children": [
-            {
-              "name": "burrata_caprese",
-              "type": "file",
-              "path": "english/recipes/burrata_caprese.md"
-            },
-            {
-              "name": "burrata_roasted_tomatoes",
-              "type": "file",
-              "path": "english/recipes/burrata_roasted_tomatoes.md"
-            },
-            {
-              "name": "burrata_tomato_confit",
-              "type": "file",
-              "path": "english/recipes/burrata_tomato_confit.md"
-            },
-            {
-              "name": "cilbir_recipe",
-              "type": "file",
-              "path": "english/recipes/cilbir_recipe.md"
-            },
-            {
-              "name": "el_tesoro_de_patitas",
-              "type": "file",
-              "path": "english/recipes/el_tesoro_de_patitas.md"
-            },
-            {
-              "name": "greek_chicken_gyro_bowls",
-              "type": "file",
-              "path": "english/recipes/greek_chicken_gyro_bowls.md"
-            },
-            {
-              "name": "tuna_tataki",
-              "type": "file",
-              "path": "english/recipes/tuna_tataki.md"
-            },
-            {
-              "name": "zucchini_ground_meat_stew",
-              "type": "file",
-              "path": "english/recipes/zucchini_ground_meat_stew.md"
-            }
-          ]
-        },
-        {
-          "name": "sauces",
-          "type": "folder",
-          "path": "english/sauces",
-          "children": [
-            {
-              "name": "maestranza_inspired_sauce",
-              "type": "file",
-              "path": "english/sauces/maestranza_inspired_sauce.md"
-            },
-            {
-              "name": "tzatziki_sauce",
-              "type": "file",
-              "path": "english/sauces/tzatziki_sauce.md"
-            }
-          ]
-        },
-        {
-          "name": "spices",
-          "type": "folder",
-          "path": "english/spices",
-          "children": [
-            {
-              "name": "zaatar_chilean_version",
-              "type": "file",
-              "path": "english/spices/zaatar_chilean_version.md"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "spanish",
-      "type": "folder",
-      "path": "spanish",
-      "children": [
-        {
-          "name": "bakery",
-          "type": "folder",
-          "path": "spanish/bakery",
-          "children": [
-            {
-              "name": "pan_de_platano",
-              "type": "file",
-              "path": "spanish/bakery/pan_de_platano.md"
-            }
-          ]
-        },
-        {
-          "name": "methods",
-          "type": "folder",
-          "path": "spanish/methods",
-          "children": [
-            {
-              "name": "consejos_huevos_escalfados",
-              "type": "file",
-              "path": "spanish/methods/consejos_huevos_escalfados.md"
-            },
-            {
-              "name": "gajos_de_papa_dulce_en_freidora_de_aire",
-              "type": "file",
-              "path": "spanish/methods/gajos_de_papa_dulce_en_freidora_de_aire.md"
-            },
-            {
-              "name": "papa_dulce_entera_al_horno_en_freidora_de_aire",
-              "type": "file",
-              "path": "spanish/methods/papa_dulce_entera_al_horno_en_freidora_de_aire.md"
-            },
-            {
-              "name": "papas_dulces_en_cubos_en_freidora_de_aire",
-              "type": "file",
-              "path": "spanish/methods/papas_dulces_en_cubos_en_freidora_de_aire.md"
-            },
-            {
-              "name": "papas_dulces_fritas_en_freidora_de_aire",
-              "type": "file",
-              "path": "spanish/methods/papas_dulces_fritas_en_freidora_de_aire.md"
-            },
-            {
-              "name": "salsa_de_tomates_asados",
-              "type": "file",
-              "path": "spanish/methods/salsa_de_tomates_asados.md"
-            },
-            {
-              "name": "salsa_pizza_chicago",
-              "type": "file",
-              "path": "spanish/methods/salsa_pizza_chicago.md"
-            },
-            {
-              "name": "salsa_pizza_detroit",
-              "type": "file",
-              "path": "spanish/methods/salsa_pizza_detroit.md"
-            },
-            {
-              "name": "salsa_pizza_napolitana",
-              "type": "file",
-              "path": "spanish/methods/salsa_pizza_napolitana.md"
-            },
-            {
-              "name": "salsa_pizza_nueva_york",
-              "type": "file",
-              "path": "spanish/methods/salsa_pizza_nueva_york.md"
-            },
-            {
-              "name": "tecnicas_salsa_pizza",
-              "type": "file",
-              "path": "spanish/methods/tecnicas_salsa_pizza.md"
-            },
-            {
-              "name": "tecnicas_salsa_tzatziki",
-              "type": "file",
-              "path": "spanish/methods/tecnicas_salsa_tzatziki.md"
-            }
-          ]
-        },
-        {
-          "name": "recipes",
-          "type": "folder",
-          "path": "spanish/recipes",
-          "children": [
-            {
-              "name": "boles_de_gyro_de_pollo_griego",
-              "type": "file",
-              "path": "spanish/recipes/boles_de_gyro_de_pollo_griego.md"
-            },
-            {
-              "name": "burrata_caprese",
-              "type": "file",
-              "path": "spanish/recipes/burrata_caprese.md"
-            },
-            {
-              "name": "burrata_confit_tomate",
-              "type": "file",
-              "path": "spanish/recipes/burrata_confit_tomate.md"
-            },
-            {
-              "name": "burrata_tomates_asados",
-              "type": "file",
-              "path": "spanish/recipes/burrata_tomates_asados.md"
-            },
-            {
-              "name": "el_tesoro_de_patitas",
-              "type": "file",
-              "path": "spanish/recipes/el_tesoro_de_patitas.md"
-            },
-            {
-              "name": "guiso_de_zapallo_italiano_y_carne_molida",
-              "type": "file",
-              "path": "spanish/recipes/guiso_de_zapallo_italiano_y_carne_molida.md"
-            },
-            {
-              "name": "receta_cilbir",
-              "type": "file",
-              "path": "spanish/recipes/receta_cilbir.md"
-            },
-            {
-              "name": "tataki_de_atun",
-              "type": "file",
-              "path": "spanish/recipes/tataki_de_atun.md"
-            }
-          ]
-        },
-        {
-          "name": "sauces",
-          "type": "folder",
-          "path": "spanish/sauces",
-          "children": [
-            {
-              "name": "salsa_inspirada_en_la_maestranza",
-              "type": "file",
-              "path": "spanish/sauces/salsa_inspirada_en_la_maestranza.md"
-            },
-            {
-              "name": "salsa_tzatziki",
-              "type": "file",
-              "path": "spanish/sauces/salsa_tzatziki.md"
-            }
-          ]
-        },
-        {
-          "name": "spices",
-          "type": "folder",
-          "path": "spanish/spices",
-          "children": [
-            {
-              "name": "zaatar_chileno",
-              "type": "file",
-              "path": "spanish/spices/zaatar_chileno.md"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "DEPLOYMENT",
-      "type": "file",
-      "path": "DEPLOYMENT.md"
-    },
-    {
-      "name": "README",
-      "type": "file",
-      "path": "README.md"
-    }
-  ]
-};
+const RECIPES_DATA = ${JSON.stringify(manifest, null, 2)};
 
 let expandedFolders = new Set();
 
@@ -890,10 +605,10 @@ function createFolderElement(item, level = 0) {
   const folderName = document.createElement('div');
   folderName.className = 'folder-name';
   const isExpanded = expandedFolders.has(item.path);
-  folderName.innerHTML = `<span class="folder-icon">${isExpanded ? '📂' : '📁'}</span>${formatName(item.name)}`;
+  folderName.innerHTML = \`<span class="folder-icon">\${isExpanded ? '📂' : '📁'}</span>\${formatName(item.name)}\`;
   
   const contents = document.createElement('div');
-  contents.className = `folder-contents ${isExpanded ? '' : 'collapsed'}`;
+  contents.className = \`folder-contents \${isExpanded ? '' : 'collapsed'}\`;
   
   folderName.onclick = () => {
     const icon = folderName.querySelector('.folder-icon');
@@ -942,7 +657,7 @@ function createFileElement(item) {
 function formatName(name) {
   return name
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase());
+    .replace(/\\b\\w/g, l => l.toUpperCase());
 }
 
 function renderStructure(structure) {
@@ -1014,20 +729,20 @@ async function loadRecipe(path, title) {
     // Initialize serving size adjuster
     initializeServingAdjuster(markdown);
   } catch (error) {
-    recipeContent.innerHTML = `
+    recipeContent.innerHTML = \`
       <div style="color: #c33; padding: 1em; background: #fee; border-radius: 4px;">
         ⚠️ Failed to load recipe. Please try again.
       </div>
-    `;
+    \`;
   }
 }
 
 function parseServingSize(markdown) {
   // Try to find serving size in various formats
   const patterns = [
-    /(?:Yields?|Servings?|Serves?):s*(d+)s*servings?/i,
-    /(?:Yields?|Servings?|Serves?):s*(d+)/i,
-    /(d+)s*servings?/i
+    /(?:Yields?|Servings?|Serves?):\s*(\d+)\s*servings?/i,
+    /(?:Yields?|Servings?|Serves?):\s*(\d+)/i,
+    /(\d+)\s*servings?/i
   ];
   
   for (const pattern of patterns) {
@@ -1053,11 +768,11 @@ function parseQuantity(text) {
   
   // Match patterns like "2 1/2", "2.5", "2-3", etc.
   const patterns = [
-    /^(\d+)\s+([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\d+\/\d+)/, // e.g., "2 1/2"
-    /^([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\d+\/\d+)/, // e.g., "1/2"
-    /^(\d+\.\d+)/, // e.g., "2.5"
-    /^(\d+)-(\d+)/, // e.g., "2-3" (range)
-    /^(\d+)/ // e.g., "2"
+    /^(\\d+)\\s+([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\\d+\\/\\d+)/, // e.g., "2 1/2"
+    /^([¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘]|\\d+\\/\\d+)/, // e.g., "1/2"
+    /^(\\d+\\.\\d+)/, // e.g., "2.5"
+    /^(\\d+)-(\\d+)/, // e.g., "2-3" (range)
+    /^(\\d+)/ // e.g., "2"
   ];
   
   for (const pattern of patterns) {
@@ -1104,7 +819,7 @@ function formatQuantity(num) {
   
   for (const [val, frac] of fractions) {
     if (Math.abs(decimal - val) < 0.05) {
-      return whole > 0 ? `${whole} ${frac}` : frac;
+      return whole > 0 ? \`\${whole} \${frac}\` : frac;
     }
   }
   
@@ -1125,7 +840,7 @@ function scaleIngredients(scale) {
       const formatted = formatQuantity(scaled);
       
       // Replace the quantity in the text
-      const quantityRegex = /^[\d\.\s¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘\/\-]+/;
+      const quantityRegex = /^[\\d\\.\\s¼½¾⅓⅔⅛⅜⅝⅞⅕⅖⅗⅘\\/\\-]+/;
       item.textContent = item.textContent.replace(quantityRegex, formatted + ' ');
     }
   });
@@ -1148,14 +863,14 @@ function initializeServingAdjuster(markdown) {
   // Create serving adjuster UI
   const adjuster = document.createElement('div');
   adjuster.className = 'serving-adjuster';
-  adjuster.innerHTML = `
+  adjuster.innerHTML = \`
     <div class="serving-label">Adjust Servings:</div>
     <div class="serving-controls">
       <button class="serving-btn" id="decrease-serving" aria-label="Decrease servings">−</button>
-      <div class="serving-value" id="serving-display">${currentServings} serving${currentServings !== 1 ? 's' : ''}</div>
+      <div class="serving-value" id="serving-display">\${currentServings} serving\${currentServings !== 1 ? 's' : ''}</div>
       <button class="serving-btn" id="increase-serving" aria-label="Increase servings">+</button>
     </div>
-  `;
+  \`;
   
   // Insert after the first heading or at the start
   const firstHeading = content.querySelector('h2, h3');
@@ -1186,7 +901,7 @@ function updateServings() {
   const display = document.getElementById('serving-display');
   const decreaseBtn = document.getElementById('decrease-serving');
   
-  display.textContent = `${currentServings} serving${currentServings !== 1 ? 's' : ''}`;
+  display.textContent = \`\${currentServings} serving\${currentServings !== 1 ? 's' : ''}\`;
   decreaseBtn.disabled = currentServings <= 1;
   
   scaleIngredients(scale);
@@ -1270,7 +985,7 @@ async function refactorRecipe() {
     return;
   }
   
-  const prompt = `I need you to refactor and improve this recipe. Please:
+  const prompt = \`I need you to refactor and improve this recipe. Please:
 
 1. **Maintain the exact markdown format** (headings, lists, bold text, etc.)
 2. **Improve clarity** - Make instructions clearer and more precise
@@ -1283,13 +998,13 @@ async function refactorRecipe() {
 Current recipe markdown:
 
 ---
-${currentRecipeMarkdown}
+\${currentRecipeMarkdown}
 ---
 
-Please provide the improved recipe in markdown format, ready to copy directly into my recipe file (${currentRecipePath}).
+Please provide the improved recipe in markdown format, ready to copy directly into my recipe file (\${currentRecipePath}).
 
 After you provide the refactored recipe, I'll review it and update my local markdown file manually.
-`;
+\`;
 
   try {
     await navigator.clipboard.writeText(prompt);
@@ -1336,3 +1051,105 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+`;
+
+  const frontendDir = __dirname;
+  
+  fs.writeFileSync(path.join(frontendDir, 'index.html'), html);
+  
+  // Generate PWA manifest
+  const pwaManifest = {
+    "name": "Recipes Collection",
+    "short_name": "Recipes",
+    "description": "Personal recipes collection organized by language and category",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#f5f5f5",
+    "theme_color": "#007BFF",
+    "orientation": "portrait-primary",
+    "icons": [
+      {
+        "src": "icon.svg",
+        "sizes": "any",
+        "type": "image/svg+xml",
+        "purpose": "any maskable"
+      }
+    ]
+  };
+  
+  fs.writeFileSync(
+    path.join(frontendDir, 'manifest.json'),
+    JSON.stringify(pwaManifest, null, 2)
+  );
+  
+  // Generate service worker
+  const serviceWorker = `const CACHE_NAME = 'recipes-v2';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  'https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).then(response => {
+          // Cache markdown files as they are fetched
+          if (event.request.url.endsWith('.md')) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        });
+      })
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+`;
+
+  fs.writeFileSync(path.join(frontendDir, 'service-worker.js'), serviceWorker);
+  
+  // Generate SVG icon
+  const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#007BFF" rx="64"/>
+  <text x="256" y="340" font-size="280" text-anchor="middle" fill="white" font-family="-apple-system, BlinkMacSystemFont, system-ui, sans-serif">🍳</text>
+</svg>`;
+  
+  fs.writeFileSync(path.join(frontendDir, 'icon.svg'), svgIcon);
+  
+  console.log('✅ index.html generated successfully!');
+  console.log('✅ manifest.json generated successfully!');
+  console.log('✅ service-worker.js generated successfully!');
+  console.log('✅ icon.svg generated successfully!');
+  console.log('');
+  console.log('📱 Your recipe site is now a Progressive Web App!');
+  console.log('   Deploy to GitHub Pages and you can install it on your iPhone home screen.');
+}
+
+generateHTML();

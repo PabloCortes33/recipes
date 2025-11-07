@@ -56,8 +56,10 @@ AUTH_PASSWORD=your-secure-password
 ANTHROPIC_API_KEY=sk-ant-api03-your-key
 GITHUB_TOKEN=ghp_your-token
 GITHUB_REPO=origin
-REPO_PATH=/app/recipes
+REPO_PATH=/app/repo
 ```
+
+**Important**: Set Root Directory to `backend` in Railway settings!
 
 **Security Note**: Use a strong password for `AUTH_PASSWORD`!
 
@@ -65,8 +67,8 @@ REPO_PATH=/app/recipes
 
 1. In Railway dashboard, go to your service
 2. Click "Volumes" → "New Volume"
-3. Mount path: `/app/recipes`
-4. Size: 1-2 GB (should be enough)
+3. Mount path: `/app/repo`
+4. Size: 2-3 GB (includes all recipes + frontend + backend)
 5. Click "Add Volume"
 
 ## Step 5: Initialize the Git Repository
@@ -79,8 +81,8 @@ After deployment, you need to clone your recipes repo into the volume:
 railway run bash
 
 # Inside the container:
-cd /app/recipes
-git clone https://github.com/YOUR_USERNAME/recipes.git .
+cd /app/repo
+git clone https://github.com/PabloCortes33/recipes.git .
 git config user.email "your-email@example.com"
 git config user.name "Your Name"
 ```
