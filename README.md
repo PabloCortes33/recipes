@@ -8,6 +8,7 @@ A dynamic recipe browser that displays your markdown recipes in an organized, ea
 - 📁 **Collapsible Folders** - Organized by language (English/Spanish) and category
 - 📖 **Markdown Viewer** - Read recipes directly in the browser with beautiful formatting
 - ⚖️ **Dynamic Serving Adjustment** - Automatically scale ingredient quantities for any serving size
+- 💡 **Recipe Ideas Brainstorming** - Jot down ideas on your phone, auto-saves locally, copy to paste into Claude/AI
 - 🔄 **Easy Updates** - Just run one script to regenerate everything
 - ⚡ **Progressive Web App** - Install on your home screen like a native app
 - 🚀 **Offline Support** - Access your recipes even without internet (after first visit)
@@ -71,6 +72,27 @@ The recipe viewer automatically detects serving sizes and provides +/- buttons t
 4. Click +/- to scale all ingredients proportionally
 
 No special markup needed - just write your recipes naturally!
+
+### Recipe Ideas Brainstorming
+
+Keep track of recipe ideas while you're on the go:
+
+**Features:**
+- 💾 **Auto-saves** - Your ideas are saved to your device as you type
+- 📋 **One-tap copy** - Copy all ideas to paste into Claude or your AI assistant
+- 🗑️ **Easy to clear** - Start fresh when needed
+- 📱 **Mobile-friendly** - Perfect for jotting down ideas on your phone
+
+**Workflow:**
+1. On your phone: Click "💡 Recipe Ideas" button
+2. Write down recipe ideas as they come to you
+3. Ideas save automatically to your device
+4. Later on your computer: Click "💡 Recipe Ideas"
+5. Click "📋 Copy All" to copy everything
+6. Paste into Claude or your local AI tool to develop the recipe
+7. Add the finished recipe to your markdown files!
+
+This is perfect for capturing inspiration while cooking, at the grocery store, or eating at restaurants!
 
 ## Project Structure
 

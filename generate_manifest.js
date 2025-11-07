@@ -369,17 +369,157 @@ function generateHTML() {
     height: auto;
     border-radius: 4px;
   }
-  .loading-message {
+    .loading-message {
     text-align: center;
     padding: 2em;
     color: #666;
+  }
+  
+  /* Recipe Ideas Section */
+  #ideas-section {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    padding: 1em;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  @media (min-width: 768px) {
+    #ideas-section { padding: 2em; }
+  }
+  #ideas-section.hidden {
+    display: none;
+  }
+  .ideas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1em;
+    flex-wrap: wrap;
+    gap: 1em;
+  }
+  .ideas-header h1 {
+    margin: 0;
+    font-size: 1.6em;
+    color: #333;
+    border-bottom: 3px solid #007BFF;
+    padding-bottom: 0.3em;
+    flex: 1;
+  }
+  @media (min-width: 768px) {
+    .ideas-header h1 { font-size: 2em; }
+  }
+  .ideas-textarea {
+    width: 100%;
+    min-height: 300px;
+    padding: 1em;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 1em;
+    line-height: 1.6;
+    resize: vertical;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ideas-textarea:focus {
+    outline: none;
+    border-color: #007BFF;
+  }
+  .ideas-textarea::placeholder {
+    color: #999;
+  }
+  .ideas-actions {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 1em;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 0.7em 1.2em;
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 44px;
+  }
+  @media (min-width: 768px) {
+    .btn {
+      padding: 0.5em 1em;
+      min-height: auto;
+    }
+  }
+  .btn-primary {
+    background: #007BFF;
+    color: white;
+  }
+  .btn-primary:hover, .btn-primary:active {
+    background: #0056b3;
+  }
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+  .btn-secondary:hover, .btn-secondary:active {
+    background: #545b62;
+  }
+  .btn-success {
+    background: #28a745;
+    color: white;
+  }
+  .copy-feedback {
+    display: inline-block;
+    color: #28a745;
+    font-size: 0.9em;
+    margin-left: 0.5em;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .copy-feedback.show {
+    opacity: 1;
+  }
+  .ideas-info {
+    background: #f8f9fa;
+    padding: 1em;
+    border-radius: 4px;
+    margin-bottom: 1em;
+    font-size: 0.9em;
+    color: #666;
+    line-height: 1.5;
+  }
+  .ideas-tab-btn {
+    background: #f8f9fa;
+    color: #007BFF;
+    border: 2px solid #007BFF;
+    padding: 0.5em 1em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+  }
+  .ideas-tab-btn:hover, .ideas-tab-btn:active {
+    background: #007BFF;
+    color: white;
   }
 </style>
 </head>
 <body>
 <div class="header">
   <h1>🍳 Recipes Collection</h1>
-  <div class="subtitle">Browse recipes organized by language and category</div>
+  <div class="subtitle">
+    Browse recipes organized by language and category
+    <button class="ideas-tab-btn" onclick="showIdeas()" style="margin-left: 1em;">💡 Recipe Ideas</button>
+  </div>
 </div>
 <div id="recipe-list">
   <div id="content"></div>
@@ -388,6 +528,32 @@ function generateHTML() {
 <div id="recipe-viewer" class="hidden">
   <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
   <div id="recipe-content"></div>
+</div>
+<div id="ideas-section" class="hidden">
+  <div class="ideas-header">
+    <h1>💡 Recipe Ideas</h1>
+    <button class="ideas-tab-btn" onclick="showRecipeList()">← Back to Recipes</button>
+  </div>
+  <div class="ideas-info">
+    💭 Use this space to brainstorm recipe ideas on your phone. Auto-saves as you type. Click "Copy All" to paste into Claude or your AI tool later!
+  </div>
+  <textarea 
+    id="ideas-textarea" 
+    class="ideas-textarea" 
+    placeholder="Jot down your recipe ideas here...
+
+Example:
+- Try making Turkish eggs with sriracha instead of Aleppo pepper
+- Experiment with sweet potato gnocchi
+- Air fryer version of grandma's empanadas
+
+Your ideas are automatically saved to this device."
+  ></textarea>
+  <div class="ideas-actions">
+    <button class="btn btn-primary" onclick="copyIdeas()">📋 Copy All</button>
+    <button class="btn btn-secondary" onclick="clearIdeas()">🗑️ Clear</button>
+    <span class="copy-feedback" id="copy-feedback">✓ Copied!</span>
+  </div>
 </div>
 
 <script>
@@ -699,11 +865,79 @@ function updateServings() {
 function showRecipeList() {
   const recipeViewer = document.getElementById('recipe-viewer');
   const recipeList = document.getElementById('recipe-list');
+  const ideasSection = document.getElementById('ideas-section');
   
   recipeViewer.classList.add('hidden');
+  ideasSection.classList.add('hidden');
   recipeList.classList.remove('hidden');
   window.scrollTo(0, 0);
 }
+
+// Recipe Ideas Functions
+const IDEAS_STORAGE_KEY = 'recipe-ideas';
+
+function loadIdeas() {
+  const textarea = document.getElementById('ideas-textarea');
+  const saved = localStorage.getItem(IDEAS_STORAGE_KEY);
+  if (saved) {
+    textarea.value = saved;
+  }
+}
+
+function saveIdeas() {
+  const textarea = document.getElementById('ideas-textarea');
+  localStorage.setItem(IDEAS_STORAGE_KEY, textarea.value);
+}
+
+function showIdeas() {
+  const recipeViewer = document.getElementById('recipe-viewer');
+  const recipeList = document.getElementById('recipe-list');
+  const ideasSection = document.getElementById('ideas-section');
+  
+  recipeViewer.classList.add('hidden');
+  recipeList.classList.add('hidden');
+  ideasSection.classList.remove('hidden');
+  
+  loadIdeas();
+  window.scrollTo(0, 0);
+}
+
+async function copyIdeas() {
+  const textarea = document.getElementById('ideas-textarea');
+  const feedback = document.getElementById('copy-feedback');
+  
+  try {
+    await navigator.clipboard.writeText(textarea.value);
+    feedback.classList.add('show');
+    setTimeout(() => {
+      feedback.classList.remove('show');
+    }, 2000);
+  } catch (err) {
+    // Fallback for older browsers
+    textarea.select();
+    document.execCommand('copy');
+    feedback.classList.add('show');
+    setTimeout(() => {
+      feedback.classList.remove('show');
+    }, 2000);
+  }
+}
+
+function clearIdeas() {
+  if (confirm('Are you sure you want to clear all your recipe ideas? This cannot be undone.')) {
+    const textarea = document.getElementById('ideas-textarea');
+    textarea.value = '';
+    localStorage.removeItem(IDEAS_STORAGE_KEY);
+  }
+}
+
+// Auto-save on typing
+document.addEventListener('DOMContentLoaded', () => {
+  const textarea = document.getElementById('ideas-textarea');
+  if (textarea) {
+    textarea.addEventListener('input', saveIdeas);
+  }
+});
 
 loadRecipes();
 
