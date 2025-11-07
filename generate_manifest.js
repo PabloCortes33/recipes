@@ -252,6 +252,43 @@ function generateHTML() {
       min-height: auto;
     }
   }
+  .refactor-button {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.7em 1.2em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin-bottom: 1em;
+    margin-left: 0.5em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 44px;
+  }
+  .refactor-button:hover, .refactor-button:active {
+    background: #218838;
+  }
+  @media (min-width: 768px) {
+    .refactor-button {
+      padding: 0.5em 1em;
+      min-height: auto;
+    }
+  }
+  .refactor-feedback {
+    display: inline-block;
+    color: #28a745;
+    font-size: 0.9em;
+    margin-left: 0.5em;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .refactor-feedback.show {
+    opacity: 1;
+  }
   
   /* Serving Size Adjuster */
   .serving-adjuster {
@@ -527,6 +564,8 @@ function generateHTML() {
 </div>
 <div id="recipe-viewer" class="hidden">
   <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
+  <button class="refactor-button" onclick="refactorRecipe()">🤖 Refactor with AI</button>
+  <span class="refactor-feedback" id="refactor-feedback">✓ Copied to clipboard! Paste into Claude.</span>
   <div id="recipe-content"></div>
 </div>
 <div id="ideas-section" class="hidden">
@@ -659,11 +698,18 @@ function loadRecipes() {
 let currentServings = 1;
 let originalServings = 1;
 let originalIngredients = [];
+let currentRecipeMarkdown = '';
+let currentRecipePath = '';
+let currentRecipeTitle = '';
 
 async function loadRecipe(path, title) {
   const recipeViewer = document.getElementById('recipe-viewer');
   const recipeContent = document.getElementById('recipe-content');
   const recipeList = document.getElementById('recipe-list');
+  
+  // Store current recipe info for refactoring
+  currentRecipePath = path;
+  currentRecipeTitle = title;
   
   // Show loading message
   recipeContent.innerHTML = '<div class="loading-message">Loading recipe...</div>';
@@ -678,6 +724,7 @@ async function loadRecipe(path, title) {
     if (!response.ok) throw new Error('Failed to load recipe');
     
     const markdown = await response.text();
+    currentRecipeMarkdown = markdown; // Store for refactoring
     const html = marked.parse(markdown);
     recipeContent.innerHTML = html;
     
@@ -928,6 +975,60 @@ function clearIdeas() {
     const textarea = document.getElementById('ideas-textarea');
     textarea.value = '';
     localStorage.removeItem(IDEAS_STORAGE_KEY);
+  }
+}
+
+// Recipe Refactoring with AI
+async function refactorRecipe() {
+  const feedback = document.getElementById('refactor-feedback');
+  
+  if (!currentRecipeMarkdown) {
+    alert('No recipe loaded. Please open a recipe first.');
+    return;
+  }
+  
+  const prompt = \`I need you to refactor and improve this recipe. Please:
+
+1. **Maintain the exact markdown format** (headings, lists, bold text, etc.)
+2. **Improve clarity** - Make instructions clearer and more precise
+3. **Enhance techniques** - Add helpful cooking tips where appropriate
+4. **Optimize measurements** - Ensure quantities are practical and accurate
+5. **Fix any issues** - Correct typos, unclear language, or logical flow problems
+6. **Keep the same structure** - Don't change the overall organization
+7. **Preserve the essence** - This is my personal recipe, keep its character
+
+Current recipe markdown:
+
+---
+\${currentRecipeMarkdown}
+---
+
+Please provide the improved recipe in markdown format, ready to copy directly into my recipe file (\${currentRecipePath}).
+
+After you provide the refactored recipe, I'll review it and update my local markdown file manually.
+\`;
+
+  try {
+    await navigator.clipboard.writeText(prompt);
+    feedback.classList.add('show');
+    setTimeout(() => {
+      feedback.classList.remove('show');
+    }, 4000);
+  } catch (err) {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = prompt;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    
+    feedback.classList.add('show');
+    setTimeout(() => {
+      feedback.classList.remove('show');
+    }, 4000);
   }
 }
 

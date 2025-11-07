@@ -9,6 +9,7 @@ A dynamic recipe browser that displays your markdown recipes in an organized, ea
 - 📖 **Markdown Viewer** - Read recipes directly in the browser with beautiful formatting
 - ⚖️ **Dynamic Serving Adjustment** - Automatically scale ingredient quantities for any serving size
 - 💡 **Recipe Ideas Brainstorming** - Jot down ideas on your phone, auto-saves locally, copy to paste into Claude/AI
+- 🤖 **AI-Powered Refactoring** - One-click to copy recipe + prompt to Claude for improvements
 - 🔄 **Easy Updates** - Just run one script to regenerate everything
 - ⚡ **Progressive Web App** - Install on your home screen like a native app
 - 🚀 **Offline Support** - Access your recipes even without internet (after first visit)
@@ -93,6 +94,29 @@ Keep track of recipe ideas while you're on the go:
 7. Add the finished recipe to your markdown files!
 
 This is perfect for capturing inspiration while cooking, at the grocery store, or eating at restaurants!
+
+### AI-Powered Recipe Refactoring
+
+Improve your recipes with Claude's help using the simple clipboard workflow:
+
+**How it works:**
+1. Open any recipe in the viewer
+2. Click "🤖 Refactor with AI" button
+3. The recipe markdown + a detailed prompt copies to your clipboard
+4. Paste into Claude (or your local AI tool)
+5. Claude suggests improvements while maintaining your recipe's format
+6. Copy the improved version
+7. Update your local `.md` file
+8. Run `node generate_manifest.js` and push!
+
+**What Claude will improve:**
+- Clarity of instructions
+- Cooking techniques and tips
+- Measurement accuracy
+- Flow and organization
+- Grammar and typos
+
+**No API keys needed!** This uses the simple clipboard approach - you're in full control of what changes to accept.
 
 ## Project Structure
 
