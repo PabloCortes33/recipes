@@ -1,0 +1,36 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to VPS via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          echo "🚀 Starting deployment..."
+          cd /home/compute/recipes
+          
+          echo "📥 Pulling latest changes..."
+          git pull origin main
+          
+          echo "📦 Installing backend dependencies..."
+          cd backend
+          npm install --production
+          
+          echo "🔄 Restarting backend service..."
+          pm2 restart recipes-backend || pm2 start server.js --name recipes-backend
+          
+          echo "✅ Deployment complete!"
+          pm2 status recipes-backend
+
