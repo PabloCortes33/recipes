@@ -113,21 +113,21 @@ Provide your response in this format:
 English: [filename].md
 Spanish: [filename].md`;
 
-    // Generate recipe with Claude API (reliable formatting)
-    if (!anthropic) {
-      return res.status(500).json({ error: 'Anthropic API key not configured' });
+    // Generate recipe with Claude CLI (headless mode)
+    const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
+    
+    let response;
+    try {
+      const { stdout, stderr } = await execPromise(`claude -p '${escapedRecipePrompt}'`);
+      if (stderr) console.error('Claude stderr:', stderr);
+      response = stdout.trim();
+      console.log('Recipe generated via Claude CLI');
+    } catch (error) {
+      return res.status(500).json({ 
+        error: 'Claude CLI failed', 
+        details: error.message 
+      });
     }
-    
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      messages: [{
-        role: 'user',
-        content: recipePrompt
-      }]
-    });
-    
-    const response = message.content[0].text;
 
     // Parse the response
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
