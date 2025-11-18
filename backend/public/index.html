@@ -197,9 +197,17 @@
             
             <!-- Recipe Generation Form -->
             <div class="form-group">
+                <label for="model-select">AI Model:</label>
+                <select id="model-select" style="width: 100%; padding: 0.8em; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 1em;">
+                    <option value="claude">🤖 Claude Sonnet 4</option>
+                    <option value="gemini">🔷 Gemini (CLI)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
                 <label for="research-query">Research Query (optional):</label>
                 <input type="text" id="research-query" placeholder="e.g., 'Italian carbonara sauce techniques'">
-                <small style="color: #666;">Leave empty to skip research phase</small>
+                <small style="color: #666;">Leave empty to skip research phase (uses Claude)</small>
             </div>
             
             <div class="form-group">
@@ -253,6 +261,7 @@
         }
         
         async function generateRecipe() {
+            const model = document.getElementById('model-select').value;
             const researchQuery = document.getElementById('research-query').value;
             const prompt = document.getElementById('recipe-prompt').value;
             
@@ -261,7 +270,8 @@
                 return;
             }
             
-            showStatus('generation-status', 'Generating recipe... This may take a minute.', 'info');
+            const modelName = model === 'gemini' ? 'Gemini' : 'Claude';
+            showStatus('generation-status', `Generating recipe with ${modelName}... This may take a minute.`, 'info');
             document.getElementById('generate-btn').disabled = true;
             document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>AI is creating your recipe...</p></div>';
             document.getElementById('recipe-preview').classList.remove('hidden');
@@ -273,15 +283,15 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({ prompt, researchQuery })
+                    body: JSON.stringify({ prompt, researchQuery, model })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
                     currentRecipes = data.recipes;
-                    displayRecipePreview(data.recipes);
-                    showStatus('generation-status', 'Recipe generated successfully!', 'success');
+                    displayRecipePreview(data.recipes, data.model);
+                    showStatus('generation-status', `Recipe generated successfully with ${data.model === 'gemini' ? 'Gemini' : 'Claude'}!`, 'success');
                     document.getElementById('git-controls').classList.remove('hidden');
                 } else {
                     showStatus('generation-status', 'Failed to generate recipe', 'error');
@@ -295,10 +305,12 @@
             }
         }
         
-        function displayRecipePreview(recipes) {
+        function displayRecipePreview(recipes, model) {
             const preview = document.getElementById('recipe-preview');
+            const modelEmoji = model === 'gemini' ? '🔷' : '🤖';
+            const modelName = model === 'gemini' ? 'Gemini' : 'Claude';
             preview.innerHTML = `
-                <h3>Generated Recipes</h3>
+                <h3>Generated Recipes ${modelEmoji} (${modelName})</h3>
                 <div style="margin-bottom: 2em;">
                     <h4>🇬🇧 English: ${recipes.english.filename}</h4>
                     <pre>${recipes.english.content}</pre>

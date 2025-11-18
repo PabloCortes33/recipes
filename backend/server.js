@@ -57,19 +57,15 @@ app.get('/api/health', (req, res) => {
 // Generate recipe with AI
 app.post('/api/generate-recipe', authMiddleware, async (req, res) => {
   try {
-    if (!anthropic) {
-      return res.status(500).json({ error: 'Anthropic API key not configured' });
-    }
-
-    const { prompt, researchQuery } = req.body;
+    const { prompt, researchQuery, model = 'claude' } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // First, do research if requested
+    // First, do research if requested (always use Claude for research)
     let researchContext = '';
-    if (researchQuery) {
+    if (researchQuery && anthropic) {
       const researchMessage = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4096,
@@ -82,17 +78,12 @@ app.post('/api/generate-recipe', authMiddleware, async (req, res) => {
       researchContext = researchMessage.content[0].text;
     }
 
-    // Generate the recipe
+    // Build full prompt with research context
     const fullPrompt = researchContext 
       ? `Based on this research:\n\n${researchContext}\n\n---\n\nNow, ${prompt}`
       : prompt;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      messages: [{
-        role: 'user',
-        content: `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe:
+    const recipePrompt = `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe:
 1. English version (save as recipes/english/recipes/[recipe_name].md)
 2. Spanish version (save as recipes/spanish/recipes/[recipe_name].md)
 
@@ -111,13 +102,48 @@ Provide your response in this format:
 [full recipe markdown]
 ===FILENAMES===
 English: [filename].md
-Spanish: [filename].md`
-      }]
-    });
+Spanish: [filename].md`;
 
-    const response = message.content[0].text;
-    
-    // Parse the response
+    let response;
+
+    // Choose model
+    if (model === 'gemini') {
+      // Use Gemini CLI
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execPromise = promisify(exec);
+      
+      // Escape single quotes in prompt and use single quotes to wrap
+      const escapedPrompt = recipePrompt.replace(/'/g, "'\\''");
+      
+      try {
+        const { stdout, stderr } = await execPromise(`gemini -p '${escapedPrompt}'`);
+        if (stderr) console.error('Gemini stderr:', stderr);
+        response = stdout;
+      } catch (error) {
+        return res.status(500).json({ 
+          error: 'Gemini CLI failed', 
+          details: error.message 
+        });
+      }
+    } else {
+      // Use Claude (default)
+      if (!anthropic) {
+        return res.status(500).json({ error: 'Anthropic API key not configured' });
+      }
+      
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        messages: [{
+          role: 'user',
+          content: recipePrompt
+        }]
+      });
+      response = message.content[0].text;
+    }
+
+    // Parse the response (same for both models)
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
     const spanishMatch = response.match(/===SPANISH===\n([\s\S]*?)===FILENAMES===/);
     const filenamesMatch = response.match(/===FILENAMES===\n([\s\S]*?)$/);
@@ -146,6 +172,7 @@ Spanish: [filename].md`
 
     res.json({
       success: true,
+      model: model,
       recipes: {
         english: {
           content: englishRecipe,
