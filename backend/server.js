@@ -55,7 +55,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Generate recipe with AI
-app.post('/api/generate-recipe', authMiddleware, async (req, res) => {
+app.post('/api/generate-recipe', async (req, res) => {
   try {
     const { prompt, researchQuery } = req.body;
 
@@ -184,7 +184,7 @@ Spanish: [filename].md`;
 });
 
 // Save recipe and commit to git
-app.post('/api/save-recipe', authMiddleware, async (req, res) => {
+app.post('/api/save-recipe', async (req, res) => {
   try {
     const { recipes, commitMessage } = req.body;
 
@@ -238,7 +238,7 @@ app.post('/api/save-recipe', authMiddleware, async (req, res) => {
 });
 
 // Push to GitHub
-app.post('/api/git/push', authMiddleware, async (req, res) => {
+app.post('/api/git/push', async (req, res) => {
   try {
     if (GITHUB_TOKEN) {
       // Configure git with token
@@ -262,7 +262,7 @@ app.post('/api/git/push', authMiddleware, async (req, res) => {
 });
 
 // Pull from GitHub
-app.post('/api/git/pull', authMiddleware, async (req, res) => {
+app.post('/api/git/pull', async (req, res) => {
   try {
     await git.pull(GITHUB_REPO, 'main');
 
@@ -281,7 +281,7 @@ app.post('/api/git/pull', authMiddleware, async (req, res) => {
 });
 
 // Get git status
-app.get('/api/git/status', authMiddleware, async (req, res) => {
+app.get('/api/git/status', async (req, res) => {
   try {
     const status = await git.status();
 
@@ -306,7 +306,7 @@ app.get('/api/git/status', authMiddleware, async (req, res) => {
 });
 
 // List recipes
-app.get('/api/recipes', authMiddleware, async (req, res) => {
+app.get('/api/recipes', async (req, res) => {
   try {
     const englishRecipes = await fs.readdir(path.join(RECIPES_PATH, 'english/recipes'));
     const spanishRecipes = await fs.readdir(path.join(RECIPES_PATH, 'spanish/recipes'));
