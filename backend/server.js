@@ -57,25 +57,34 @@ app.get('/api/health', (req, res) => {
 // Generate recipe with AI
 app.post('/api/generate-recipe', authMiddleware, async (req, res) => {
   try {
-    const { prompt, researchQuery, model = 'claude' } = req.body;
+    const { prompt, researchQuery } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // First, do research if requested (always use Claude for research)
-    let researchContext = '';
-    if (researchQuery && anthropic) {
-      const researchMessage = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: `You are a research expert. Research the following topic and provide detailed information that will help create a recipe:\n\n${researchQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`
-        }]
-      });
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execPromise = promisify(exec);
 
-      researchContext = researchMessage.content[0].text;
+    // First, do research if requested (use Claude CLI with Gemini agent)
+    let researchContext = '';
+    if (researchQuery) {
+      try {
+        // Escape single quotes for shell command
+        const escapedQuery = researchQuery.replace(/'/g, "'\\''");
+        const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
+        const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
+        
+        // Use Claude CLI with Gemini research agent
+        const { stdout, stderr } = await execPromise(`claude -p '@gemini-research-expert ${escapedResearchPrompt}'`);
+        if (stderr) console.error('Research stderr:', stderr);
+        researchContext = stdout.trim();
+        console.log('Research completed via Gemini agent');
+      } catch (error) {
+        console.error('Research failed:', error.message);
+        // Continue without research if it fails
+      }
     }
 
     // Build full prompt with research context
@@ -104,46 +113,23 @@ Provide your response in this format:
 English: [filename].md
 Spanish: [filename].md`;
 
-    let response;
-
-    // Choose model
-    if (model === 'gemini') {
-      // Use Gemini CLI
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
-      const execPromise = promisify(exec);
-      
-      // Escape single quotes in prompt and use single quotes to wrap
-      const escapedPrompt = recipePrompt.replace(/'/g, "'\\''");
-      
-      try {
-        const { stdout, stderr } = await execPromise(`gemini -p '${escapedPrompt}'`);
-        if (stderr) console.error('Gemini stderr:', stderr);
-        response = stdout;
-      } catch (error) {
-        return res.status(500).json({ 
-          error: 'Gemini CLI failed', 
-          details: error.message 
-        });
-      }
-    } else {
-      // Use Claude (default)
-      if (!anthropic) {
-        return res.status(500).json({ error: 'Anthropic API key not configured' });
-      }
-      
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8192,
-        messages: [{
-          role: 'user',
-          content: recipePrompt
-        }]
-      });
-      response = message.content[0].text;
+    // Generate recipe with Claude API (reliable formatting)
+    if (!anthropic) {
+      return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
+    
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: recipePrompt
+      }]
+    });
+    
+    const response = message.content[0].text;
 
-    // Parse the response (same for both models)
+    // Parse the response
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
     const spanishMatch = response.match(/===SPANISH===\n([\s\S]*?)===FILENAMES===/);
     const filenamesMatch = response.match(/===FILENAMES===\n([\s\S]*?)$/);
@@ -172,7 +158,6 @@ Spanish: [filename].md`;
 
     res.json({
       success: true,
-      model: model,
       recipes: {
         english: {
           content: englishRecipe,
@@ -185,7 +170,8 @@ Spanish: [filename].md`;
           path: `recipes/spanish/recipes/${spanishFilename}`
         }
       },
-      researchContext: researchContext || null
+      researchContext: researchContext || null,
+      usedResearch: !!researchContext
     });
 
   } catch (error) {
