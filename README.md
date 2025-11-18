@@ -198,3 +198,4 @@ Your secrets are protected by `.gitignore` - just don't manually add `.env` to g
 Read the full architecture guide: `docs/ARCHITECTURE.md`
 
 Happy cooking! 🍳
+# Test deploy
