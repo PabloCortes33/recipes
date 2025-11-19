@@ -107,7 +107,7 @@ const processJob = async (jobId, jobData) => {
         const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
-        const { stdout, stderr } = await execPromise(`claude -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+        const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
           timeout: 120000 // 2 minute timeout
         });
         if (stderr) console.error('Research stderr:', stderr);
@@ -156,7 +156,7 @@ Spanish: [filename].md`;
     // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
-    const { stdout, stderr } = await execPromise(`claude -p '${escapedRecipePrompt}'`, {
+    const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
       timeout: 180000 // 3 minute timeout
     });
     if (stderr) console.error('Claude stderr:', stderr);
