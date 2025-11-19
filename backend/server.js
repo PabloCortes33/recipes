@@ -107,7 +107,7 @@ const processJob = async (jobId, jobData) => {
         const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
-        const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+        const { stdout, stderr } = await execPromise(`unbuffer claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
           timeout: 600000 // 10 minute timeout
         });
         if (stderr) console.error('Research stderr:', stderr);
@@ -157,7 +157,7 @@ Do not add any other text before or after this format. Just output the recipes i
     // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
-    const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
+    const { stdout, stderr } = await execPromise(`unbuffer claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
       timeout: 600000 // 10 minute timeout (Claude can be slow)
     });
     if (stderr) console.error('Claude stderr:', stderr);
