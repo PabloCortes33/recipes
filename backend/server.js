@@ -215,11 +215,15 @@ Spanish: [filename].md`;
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
     
-    // Move to failed
+    // Move to failed with full error details
     const failedData = {
       ...jobData,
       status: 'failed',
       error: error.message,
+      errorStack: error.stack,
+      errorStderr: error.stderr || null,
+      errorStdout: error.stdout || null,
+      errorCode: error.code || null,
       failedAt: new Date().toISOString()
     };
     

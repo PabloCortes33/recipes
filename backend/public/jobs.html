@@ -348,9 +348,11 @@
                         </div>
                     </div>
                     <div class="job-actions">
+                        <button class="btn btn-primary btn-small" onclick="viewErrorDetails('${job.jobId}')">📋 View Full Error</button>
                         <button class="btn btn-primary btn-small" onclick="retryJob('${job.jobId}')">🔄 Retry</button>
                         <button class="btn btn-danger btn-small" onclick="deleteJob('${job.jobId}')">🗑️ Delete</button>
                     </div>
+                    <div id="error-details-${job.jobId}" style="display: none;"></div>
                 </div>
             `;
         }
@@ -439,6 +441,52 @@
                 previewDiv.style.display = 'block';
             } catch (error) {
                 alert('Error loading recipe: ' + error.message);
+            }
+        }
+        
+        async function viewErrorDetails(jobId) {
+            const errorDiv = document.getElementById(`error-details-${jobId}`);
+            
+            if (errorDiv.style.display === 'block') {
+                errorDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/job/${jobId}`);
+                const job = await response.json();
+                
+                let errorHtml = '<div class="recipe-preview" style="background: #fff3cd; border-color: #ffc107;">';
+                errorHtml += '<h4 style="color: #856404;">📋 Full Error Details</h4>';
+                
+                errorHtml += '<div style="margin-top: 1em;"><strong>Error Message:</strong></div>';
+                errorHtml += `<pre style="color: #dc3545;">${job.error || 'No error message'}</pre>`;
+                
+                if (job.errorStderr) {
+                    errorHtml += '<div style="margin-top: 1em;"><strong>stderr:</strong></div>';
+                    errorHtml += `<pre style="color: #dc3545; max-height: 300px; overflow-y: auto;">${job.errorStderr}</pre>`;
+                }
+                
+                if (job.errorStdout) {
+                    errorHtml += '<div style="margin-top: 1em;"><strong>stdout:</strong></div>';
+                    errorHtml += `<pre style="max-height: 300px; overflow-y: auto;">${job.errorStdout}</pre>`;
+                }
+                
+                if (job.errorStack) {
+                    errorHtml += '<div style="margin-top: 1em;"><strong>Stack Trace:</strong></div>';
+                    errorHtml += `<pre style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">${job.errorStack}</pre>`;
+                }
+                
+                if (job.errorCode) {
+                    errorHtml += `<div style="margin-top: 1em;"><strong>Exit Code:</strong> ${job.errorCode}</div>`;
+                }
+                
+                errorHtml += '</div>';
+                
+                errorDiv.innerHTML = errorHtml;
+                errorDiv.style.display = 'block';
+            } catch (error) {
+                alert('Error loading details: ' + error.message);
             }
         }
         
