@@ -108,7 +108,7 @@ const processJob = async (jobId, jobData) => {
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
         const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
-          timeout: 120000 // 2 minute timeout
+          timeout: 600000 // 10 minute timeout
         });
         if (stderr) console.error('Research stderr:', stderr);
         researchContext = stdout.trim();
@@ -158,7 +158,7 @@ Do not add any other text before or after this format. Just output the recipes i
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
     const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
-      timeout: 180000 // 3 minute timeout
+      timeout: 600000 // 10 minute timeout (Claude can be slow)
     });
     if (stderr) console.error('Claude stderr:', stderr);
     const response = stdout.trim();
@@ -216,15 +216,22 @@ Do not add any other text before or after this format. Just output the recipes i
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
     
+    // Check if it's a timeout error
+    const isTimeout = error.killed || error.signal === 'SIGTERM' || 
+                      (error.message && error.message.includes('timeout'));
+    
     // Move to failed with full error details
     const failedData = {
       ...jobData,
       status: 'failed',
-      error: error.message,
+      error: isTimeout ? `Timeout: Claude took longer than 10 minutes. ${error.message}` : error.message,
       errorStack: error.stack,
       errorStderr: error.stderr || null,
       errorStdout: error.stdout || null,
       errorCode: error.code || null,
+      errorSignal: error.signal || null,
+      errorKilled: error.killed || false,
+      isTimeout: isTimeout,
       failedAt: new Date().toISOString()
     };
     
