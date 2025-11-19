@@ -108,15 +108,21 @@ const processJob = async (jobId, jobData) => {
         const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
+        // Prepare environment for Claude Code CLI
+        // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
+        const claudeEnv = {
+          ...process.env,
+          HOME: process.env.HOME || '/home/pablo',
+          USER: process.env.USER || 'pablo',
+          PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        };
+        // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
+        delete claudeEnv.ANTHROPIC_API_KEY;
+        
         const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
           timeout: 600000, // 10 minute timeout
           cwd: REPO_PATH, // Ensure we're in the repo directory
-          env: {
-            ...process.env,
-            HOME: process.env.HOME || '/home/pablo',
-            USER: process.env.USER || 'pablo',
-            PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-          }
+          env: claudeEnv
         });
         if (stderr) console.error('Research stderr:', stderr);
         researchContext = stdout.trim();
@@ -165,15 +171,21 @@ Do not add any other text before or after this format. Just output the recipes i
     // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
+    // Prepare environment for Claude Code CLI
+    // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
+    const claudeEnv = {
+      ...process.env,
+      HOME: process.env.HOME || '/home/pablo',
+      USER: process.env.USER || 'pablo',
+      PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    };
+    // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
+    delete claudeEnv.ANTHROPIC_API_KEY;
+    
     const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
       timeout: 600000, // 10 minute timeout (Claude can be slow)
       cwd: REPO_PATH, // Ensure we're in the repo directory
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || '/home/pablo',
-        USER: process.env.USER || 'pablo',
-        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-      }
+      env: claudeEnv
     });
     if (stderr) console.error('Claude stderr:', stderr);
     const response = stdout.trim();
