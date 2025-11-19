@@ -103,50 +103,16 @@ const processJob = async (jobId, jobData) => {
     let researchContext = '';
     if (researchQuery) {
       try {
-        const researchPrompt = `@gemini-research-expert Research the following topic and provide detailed information that will help create a recipe:\n\n${researchQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
+        const escapedQuery = researchQuery.replace(/'/g, "'\\''");
+        const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
+        const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
-        // Use stdin for research too (avoids length limits)
-        const { spawn } = require('child_process');
-        
-        researchContext = await new Promise((resolve, reject) => {
-          const claude = spawn('claude', ['--dangerously-skip-permissions']);
-          
-          let stdout = '';
-          let stderr = '';
-          
-          claude.stdout.on('data', (data) => {
-            stdout += data.toString();
-          });
-          
-          claude.stderr.on('data', (data) => {
-            stderr += data.toString();
-          });
-          
-          claude.on('close', (code) => {
-            if (code !== 0) {
-              const error = new Error(`Research failed with code ${code}`);
-              error.stderr = stderr;
-              reject(error);
-            } else {
-              if (stderr) console.error('Research stderr:', stderr);
-              console.log(`[Job ${jobId}] Research completed`);
-              resolve(stdout.trim());
-            }
-          });
-          
-          claude.on('error', (err) => {
-            reject(err);
-          });
-          
-          claude.stdin.write(researchPrompt);
-          claude.stdin.end();
-          
-          // Timeout after 2 minutes
-          setTimeout(() => {
-            claude.kill();
-            reject(new Error('Research timeout'));
-          }, 120000);
+        const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+          timeout: 120000 // 2 minute timeout
         });
+        if (stderr) console.error('Research stderr:', stderr);
+        researchContext = stdout.trim();
+        console.log(`[Job ${jobId}] Research completed`);
         
         jobData.researchContext = researchContext;
         await writeJob(jobId, jobData, 'pending');
@@ -188,51 +154,15 @@ Spanish: [suggested_filename].md
 
 Do not add any other text before or after this format. Just output the recipes in this exact structure.`;
 
-    // Generate recipe using stdin (avoids command-line length limits)
-    const { spawn } = require('child_process');
+    // Generate recipe
+    const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
-    const response = await new Promise((resolve, reject) => {
-      const claude = spawn('claude', ['--dangerously-skip-permissions']);
-      
-      let stdout = '';
-      let stderr = '';
-      
-      claude.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      claude.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      claude.on('close', (code) => {
-        if (code !== 0) {
-          const error = new Error(`Claude exited with code ${code}`);
-          error.code = code;
-          error.stderr = stderr;
-          error.stdout = stdout;
-          reject(error);
-        } else {
-          if (stderr) console.error('Claude stderr:', stderr);
-          console.log(`[Job ${jobId}] Recipe generated`);
-          resolve(stdout.trim());
-        }
-      });
-      
-      claude.on('error', (err) => {
-        reject(err);
-      });
-      
-      // Write prompt to stdin
-      claude.stdin.write(recipePrompt);
-      claude.stdin.end();
-      
-      // Timeout after 3 minutes
-      setTimeout(() => {
-        claude.kill();
-        reject(new Error('Claude timeout after 3 minutes'));
-      }, 180000);
+    const { stdout, stderr } = await execPromise(`claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
+      timeout: 180000 // 3 minute timeout
     });
+    if (stderr) console.error('Claude stderr:', stderr);
+    const response = stdout.trim();
+    console.log(`[Job ${jobId}] Recipe generated`);
 
     // Parse response
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
