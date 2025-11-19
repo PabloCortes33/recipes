@@ -456,25 +456,36 @@
                 const response = await fetch(`/api/job/${jobId}`);
                 const job = await response.json();
                 
-                let errorHtml = '<div class="recipe-preview" style="background: #fff3cd; border-color: #ffc107;">';
-                errorHtml += '<h4 style="color: #856404;">📋 Full Error Details</h4>';
+                // Build full error text for copying
+                let fullErrorText = `Job #${jobId} Error Details\n\n`;
+                fullErrorText += `Error Message:\n${job.error || 'No error message'}\n\n`;
+                if (job.errorStderr) fullErrorText += `stderr:\n${job.errorStderr}\n\n`;
+                if (job.errorStdout) fullErrorText += `stdout:\n${job.errorStdout}\n\n`;
+                if (job.errorStack) fullErrorText += `Stack Trace:\n${job.errorStack}\n\n`;
+                if (job.errorCode) fullErrorText += `Exit Code: ${job.errorCode}\n`;
+                
+                let errorHtml = '<div class="recipe-preview" style="background: #fff3cd; border-color: #ffc107; user-select: text;">';
+                errorHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">';
+                errorHtml += '<h4 style="color: #856404; margin: 0;">📋 Full Error Details</h4>';
+                errorHtml += `<button class="btn btn-secondary btn-small" onclick="copyErrorToClipboard('${jobId}', event)">📋 Copy All</button>`;
+                errorHtml += '</div>';
                 
                 errorHtml += '<div style="margin-top: 1em;"><strong>Error Message:</strong></div>';
-                errorHtml += `<pre style="color: #dc3545;">${job.error || 'No error message'}</pre>`;
+                errorHtml += `<pre style="color: #dc3545; user-select: text;">${escapeHtml(job.error || 'No error message')}</pre>`;
                 
                 if (job.errorStderr) {
                     errorHtml += '<div style="margin-top: 1em;"><strong>stderr:</strong></div>';
-                    errorHtml += `<pre style="color: #dc3545; max-height: 300px; overflow-y: auto;">${job.errorStderr}</pre>`;
+                    errorHtml += `<pre style="color: #dc3545; max-height: 300px; overflow-y: auto; user-select: text;">${escapeHtml(job.errorStderr)}</pre>`;
                 }
                 
                 if (job.errorStdout) {
                     errorHtml += '<div style="margin-top: 1em;"><strong>stdout:</strong></div>';
-                    errorHtml += `<pre style="max-height: 300px; overflow-y: auto;">${job.errorStdout}</pre>`;
+                    errorHtml += `<pre style="max-height: 300px; overflow-y: auto; user-select: text;">${escapeHtml(job.errorStdout)}</pre>`;
                 }
                 
                 if (job.errorStack) {
                     errorHtml += '<div style="margin-top: 1em;"><strong>Stack Trace:</strong></div>';
-                    errorHtml += `<pre style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">${job.errorStack}</pre>`;
+                    errorHtml += `<pre style="font-size: 0.8em; max-height: 200px; overflow-y: auto; user-select: text;">${escapeHtml(job.errorStack)}</pre>`;
                 }
                 
                 if (job.errorCode) {
@@ -485,8 +496,36 @@
                 
                 errorDiv.innerHTML = errorHtml;
                 errorDiv.style.display = 'block';
+                
+                // Store full error text for copying
+                window[`errorText_${jobId}`] = fullErrorText;
             } catch (error) {
                 alert('Error loading details: ' + error.message);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function copyErrorToClipboard(jobId, event) {
+            event.stopPropagation();
+            const errorText = window[`errorText_${jobId}`];
+            if (errorText) {
+                navigator.clipboard.writeText(errorText).then(() => {
+                    alert('✅ Error details copied to clipboard!');
+                }).catch(err => {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = errorText;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('✅ Error details copied to clipboard!');
+                });
             }
         }
         
