@@ -505,7 +505,7 @@
 </div>
 <div id="recipe-list">
   <div id="content"></div>
-  <div class="timestamp">Last updated: 11/19/2025, 4:59:01 PM</div>
+  <div class="timestamp">Last updated: 11/19/2025, 5:20:38 PM</div>
 </div>
 <div id="recipe-viewer" class="hidden">
   <button class="back-button" onclick="showRecipeList()">← Back to Recipes</button>
@@ -542,7 +542,7 @@ Your ideas are automatically saved to this device."
 
 <script>
 const RECIPES_DATA = {
-  "generated": "2025-11-19T19:59:01.160Z",
+  "generated": "2025-11-19T20:20:38.353Z",
   "structure": [
     {
       "name": "english",
@@ -673,6 +673,11 @@ const RECIPES_DATA = {
               "name": "burrata_tomato_confit",
               "type": "file",
               "path": "recipes/english/recipes/burrata_tomato_confit.md"
+            },
+            {
+              "name": "chicken_shawarma_wraps_with_tzatziki",
+              "type": "file",
+              "path": "recipes/english/recipes/chicken_shawarma_wraps_with_tzatziki.md"
             },
             {
               "name": "cilbir_recipe",
@@ -916,6 +921,11 @@ const RECIPES_DATA = {
               "name": "tataki_de_atun",
               "type": "file",
               "path": "recipes/spanish/recipes/tataki_de_atun.md"
+            },
+            {
+              "name": "wraps_shawarma_pollo_con_tzatziki",
+              "type": "file",
+              "path": "recipes/spanish/recipes/wraps_shawarma_pollo_con_tzatziki.md"
             }
           ]
         },
@@ -955,17 +965,14 @@ const RECIPES_DATA = {
 
 let expandedFolders = new Set();
 
-function createFolderElement(item, level = 0, isSpanish = false) {
+function createFolderElement(item, level = 0) {
   const folder = document.createElement('div');
   folder.className = 'folder';
-  
-  // Check if this is in Spanish section (check path or parent context)
-  const inSpanishSection = isSpanish || item.path.includes('/spanish/');
   
   const folderName = document.createElement('div');
   folderName.className = 'folder-name';
   const isExpanded = expandedFolders.has(item.path);
-  folderName.innerHTML = `<span class="folder-icon">${isExpanded ? '📂' : '📁'}</span>${formatName(item.name, inSpanishSection)}`;
+  folderName.innerHTML = `<span class="folder-icon">${isExpanded ? '📂' : '📁'}</span>${formatName(item.name)}`;
   
   const contents = document.createElement('div');
   contents.className = `folder-contents ${isExpanded ? '' : 'collapsed'}`;
@@ -986,7 +993,7 @@ function createFolderElement(item, level = 0, isSpanish = false) {
   if (item.children) {
     item.children.forEach(child => {
       if (child.type === 'folder') {
-        contents.appendChild(createFolderElement(child, level + 1, inSpanishSection));
+        contents.appendChild(createFolderElement(child, level + 1));
       } else {
         contents.appendChild(createFileElement(child));
       }
@@ -1014,21 +1021,7 @@ function createFileElement(item) {
   return file;
 }
 
-function formatName(name, isSpanish = false) {
-  // Category translations
-  const translations = {
-    'bakery': 'Panadería',
-    'methods': 'Métodos',
-    'recipes': 'Recetas',
-    'sauces': 'Salsas',
-    'spices': 'Especias'
-  };
-  
-  // Translate category names if in Spanish section
-  if (isSpanish && translations[name.toLowerCase()]) {
-    return translations[name.toLowerCase()];
-  }
-  
+function formatName(name) {
   return name
     .replace(/_/g, ' ')
     .replace(/\b\w/g, l => l.toUpperCase());
@@ -1044,14 +1037,13 @@ function renderStructure(structure) {
       section.className = 'language-section';
       
       const title = document.createElement('h2');
-      title.textContent = item.name === 'english' ? '🇬🇧 English' : '🇪🇸 Español';
+      title.textContent = item.name === 'english' ? '🇬🇧 English' : '🇪🇸 Spanish';
       section.appendChild(title);
       
       if (item.children) {
-        const isSpanish = item.name === 'spanish';
         item.children.forEach(child => {
           if (child.type === 'folder') {
-            section.appendChild(createFolderElement(child, 0, isSpanish));
+            section.appendChild(createFolderElement(child));
           }
         });
       }
