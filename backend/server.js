@@ -537,6 +537,221 @@ app.post('/api/job/:jobId/commit', async (req, res) => {
   }
 });
 
+// Refine a completed recipe (brainstorm/iterate)
+app.post('/api/job/:jobId/refine', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { refinementPrompt } = req.body;
+    
+    if (!refinementPrompt || !refinementPrompt.trim()) {
+      return res.status(400).json({ error: 'Refinement prompt is required' });
+    }
+    
+    console.log(`[Refine] Starting refinement for job ${jobId}`);
+    
+    const job = await readJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    if (job.folder !== 'completed') {
+      return res.status(400).json({ error: 'Can only refine completed recipes' });
+    }
+    
+    if (!job.recipes || !job.recipes.english || !job.recipes.spanish) {
+      return res.status(400).json({ error: 'Job missing recipe data' });
+    }
+    
+    // Create a new job for the refinement
+    const refineJobId = Date.now().toString();
+    const refineJobData = {
+      jobId: refineJobId,
+      prompt: refinementPrompt,
+      mode: 'refine',
+      originalJobId: jobId,
+      originalRecipes: job.recipes,
+      status: 'pending',
+      progress: 'Starting refinement...',
+      createdAt: new Date().toISOString()
+    };
+    
+    await writeJob(refineJobId, refineJobData, 'pending');
+    
+    // Start processing refinement in background
+    processRefinement(refineJobId, refineJobData).catch(err => {
+      console.error(`Background refinement job ${refineJobId} error:`, err);
+    });
+    
+    res.json({
+      success: true,
+      jobId: refineJobId,
+      originalJobId: jobId,
+      message: 'Refinement started'
+    });
+    
+  } catch (error) {
+    console.error('Error starting refinement:', error);
+    res.status(500).json({
+      error: 'Failed to start refinement',
+      details: error.message
+    });
+  }
+});
+
+// Process refinement job
+const processRefinement = async (jobId, jobData) => {
+  try {
+    const { refinementPrompt, originalRecipes } = jobData;
+    
+    // Update status: Refining
+    jobData.status = 'refining';
+    jobData.progress = 'Refining recipe with Claude CLI...';
+    await writeJob(jobId, jobData, 'pending');
+    
+    // Build refinement prompt
+    const refinePrompt = `I have an existing recipe that I want to refine. Here is the current recipe:
+
+===CURRENT ENGLISH RECIPE===
+${originalRecipes.english.content}
+
+===CURRENT SPANISH RECIPE===
+${originalRecipes.spanish.content}
+
+===REFINEMENT REQUEST===
+${refinementPrompt}
+
+IMPORTANT: Generate TWO refined versions of the recipe in markdown format (English and Spanish).
+
+For each version:
+- Use proper markdown format
+- Include: title, description, yields, prep/cook time
+- Organize: Ingredients section with proper grouping
+- Organize: Instructions section with clear steps
+- Use the same structure as existing recipes in the collection
+- Keep the recipe name consistent between versions (translated)
+- Apply the refinement request while maintaining the recipe's core identity
+
+You MUST provide your response EXACTLY in this format (output the content, do not try to save files):
+
+===ENGLISH===
+[full English recipe markdown content here]
+===SPANISH===
+[full Spanish recipe markdown content here]
+===FILENAMES===
+English: [suggested_filename].md
+Spanish: [suggested_filename].md
+
+Do not add any other text before or after this format. Just output the refined recipes in this exact structure.`;
+
+    const escapedRefinePrompt = refinePrompt.replace(/'/g, "'\\''");
+    
+    // Prepare environment for Claude Code CLI
+    const claudeEnv = {
+      ...process.env,
+      HOME: process.env.HOME || '/home/pablo',
+      USER: process.env.USER || 'pablo',
+      PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    };
+    delete claudeEnv.ANTHROPIC_API_KEY;
+    
+    const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedRefinePrompt}'`, {
+      timeout: 600000,
+      cwd: REPO_PATH,
+      env: claudeEnv
+    });
+    
+    if (stderr) console.error('Claude stderr:', stderr);
+    const response = stdout.trim();
+    console.log(`[Refine ${jobId}] Recipe refined`);
+    
+    // Parse response
+    const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
+    const spanishMatch = response.match(/===SPANISH===\n([\s\S]*?)===FILENAMES===/);
+    const filenamesMatch = response.match(/===FILENAMES===\n([\s\S]*?)$/);
+    
+    if (!englishMatch || !spanishMatch) {
+      throw new Error('Failed to parse refined recipe format from AI response');
+    }
+    
+    const englishRecipe = englishMatch[1].trim();
+    const spanishRecipe = spanishMatch[1].trim();
+    
+    let englishFilename = originalRecipes.english.filename;
+    let spanishFilename = originalRecipes.spanish.filename;
+    
+    if (filenamesMatch) {
+      const filenames = filenamesMatch[1];
+      const engMatch = filenames.match(/English:\s*(.+\.md)/);
+      const spaMatch = filenames.match(/Spanish:\s*(.+\.md)/);
+      if (engMatch) englishFilename = engMatch[1].trim();
+      if (spaMatch) spanishFilename = spaMatch[1].trim();
+    }
+    
+    // Update the original job with refined recipes
+    const originalJobId = jobData.originalJobId;
+    const originalJob = originalJobId ? await readJob(originalJobId) : null;
+    
+    const refinedJobData = {
+      ...(originalJob || jobData),
+      status: 'completed',
+      progress: 'Recipe refined successfully',
+      completedAt: new Date().toISOString(),
+      recipes: {
+        english: {
+          content: englishRecipe,
+          filename: englishFilename,
+          path: originalRecipes.english.path // Keep same path
+        },
+        spanish: {
+          content: spanishRecipe,
+          filename: spanishFilename,
+          path: originalRecipes.spanish.path // Keep same path
+        }
+      },
+      refinementHistory: [
+        ...(originalJob?.refinementHistory || []),
+        {
+          prompt: refinementPrompt,
+          refinedAt: new Date().toISOString()
+        }
+      ]
+    };
+    
+    // Update the original job with refined recipes
+    if (originalJobId) {
+      await writeJob(originalJobId, refinedJobData, 'completed');
+      await deleteJob(jobId); // Remove the refinement job
+      console.log(`[Refine ${jobId}] Updated original job ${originalJobId} with refined recipe`);
+    } else {
+      // Fallback: save as new completed job
+      await writeJob(jobId, refinedJobData, 'completed');
+      await deleteJob(jobId); // Remove from pending
+    }
+    
+    runningJobs.delete(jobId);
+    console.log(`[Refine ${jobId}] Completed successfully`);
+    
+  } catch (error) {
+    console.error(`[Refine ${jobId}] Failed:`, error);
+    
+    const failedData = {
+      ...jobData,
+      status: 'failed',
+      error: error.message,
+      errorStack: error.stack,
+      errorStderr: error.stderr || null,
+      errorStdout: error.stdout || null,
+      errorCode: error.code || null,
+      failedAt: new Date().toISOString()
+    };
+    
+    await writeJob(jobId, failedData, 'failed');
+    await deleteJob(jobId); // Remove from pending
+    runningJobs.delete(jobId);
+  }
+};
+
 // Delete a job
 app.delete('/api/job/:jobId', async (req, res) => {
   try {
