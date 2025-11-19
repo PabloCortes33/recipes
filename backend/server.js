@@ -2,8 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const simpleGit = require('simple-git');
-const Anthropic = require('@anthropic-ai/sdk');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execPromise = promisify(exec);
 require('dotenv').config();
 
 const app = express();
@@ -13,81 +16,118 @@ const PORT = process.env.PORT || 3000;
 const REPO_PATH = process.env.REPO_PATH || path.join(__dirname, '..');
 const RECIPES_PATH = path.join(REPO_PATH, 'recipes');
 const FRONTEND_PATH = path.join(REPO_PATH, 'frontend');
-const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'change-me-please';
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const JOBS_PATH = path.join(REPO_PATH, 'backend', '.jobs');
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO || 'origin';
 
 // Initialize git
 const git = simpleGit(REPO_PATH);
 
-// Initialize Anthropic
-let anthropic = null;
-if (ANTHROPIC_API_KEY) {
-  anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-}
-
-// Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Simple auth middleware
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || authHeader !== `Bearer ${AUTH_PASSWORD}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  next();
+// Create jobs directories
+const initJobsDirectories = async () => {
+  await fs.mkdir(path.join(JOBS_PATH, 'pending'), { recursive: true });
+  await fs.mkdir(path.join(JOBS_PATH, 'completed'), { recursive: true });
+  await fs.mkdir(path.join(JOBS_PATH, 'failed'), { recursive: true });
+  await fs.mkdir(path.join(JOBS_PATH, 'committed'), { recursive: true });
 };
 
-// Routes
+initJobsDirectories().catch(console.error);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    hasAnthropicKey: !!ANTHROPIC_API_KEY,
-    hasGitHubToken: !!GITHUB_TOKEN
-  });
-});
+// Running jobs map (jobId → child process)
+const runningJobs = new Map();
 
-// Generate recipe with AI
-app.post('/api/generate-recipe', async (req, res) => {
+// Middleware
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Helper: Read job from disk
+const readJob = async (jobId) => {
+  const folders = ['pending', 'completed', 'failed', 'committed'];
+  for (const folder of folders) {
+    try {
+      const jobPath = path.join(JOBS_PATH, folder, `${jobId}.json`);
+      const data = await fs.readFile(jobPath, 'utf8');
+      return { ...JSON.parse(data), folder };
+    } catch (error) {
+      // Continue to next folder
+    }
+  }
+  return null;
+};
+
+// Helper: Write job to disk
+const writeJob = async (jobId, data, folder = 'pending') => {
+  const jobPath = path.join(JOBS_PATH, folder, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(data, null, 2), 'utf8');
+};
+
+// Helper: Move job between folders
+const moveJob = async (jobId, fromFolder, toFolder) => {
+  const fromPath = path.join(JOBS_PATH, fromFolder, `${jobId}.json`);
+  const toPath = path.join(JOBS_PATH, toFolder, `${jobId}.json`);
+  
+  const data = await fs.readFile(fromPath, 'utf8');
+  await fs.writeFile(toPath, data, 'utf8');
+  await fs.unlink(fromPath);
+};
+
+// Helper: Delete job
+const deleteJob = async (jobId) => {
+  const folders = ['pending', 'completed', 'failed', 'committed'];
+  for (const folder of folders) {
+    try {
+      const jobPath = path.join(JOBS_PATH, folder, `${jobId}.json`);
+      await fs.unlink(jobPath);
+      return true;
+    } catch (error) {
+      // Continue
+    }
+  }
+  return false;
+};
+
+// Background job processor
+const processJob = async (jobId, jobData) => {
   try {
-    const { prompt, researchQuery } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
+    const { prompt, researchQuery } = jobData;
+    
+    // Update status: Researching
+    if (researchQuery) {
+      jobData.status = 'researching';
+      jobData.progress = 'Researching with Gemini...';
+      await writeJob(jobId, jobData, 'pending');
     }
 
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execPromise = promisify(exec);
-
-    // First, do research if requested (use Claude CLI with Gemini agent)
+    // Do research if requested
     let researchContext = '';
     if (researchQuery) {
       try {
-        // Escape single quotes for shell command
         const escapedQuery = researchQuery.replace(/'/g, "'\\''");
         const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
-        // Use Claude CLI with Gemini research agent
-        const { stdout, stderr } = await execPromise(`claude -p '@gemini-research-expert ${escapedResearchPrompt}'`);
+        const { stdout, stderr } = await execPromise(`claude -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+          timeout: 120000 // 2 minute timeout
+        });
         if (stderr) console.error('Research stderr:', stderr);
         researchContext = stdout.trim();
-        console.log('Research completed via Gemini agent');
+        console.log(`[Job ${jobId}] Research completed`);
+        
+        jobData.researchContext = researchContext;
+        await writeJob(jobId, jobData, 'pending');
       } catch (error) {
-        console.error('Research failed:', error.message);
-        // Continue without research if it fails
+        console.error(`[Job ${jobId}] Research failed:`, error.message);
+        // Continue without research
       }
     }
 
-    // Build full prompt with research context
+    // Update status: Generating
+    jobData.status = 'generating';
+    jobData.progress = 'Generating recipe with Claude CLI...';
+    await writeJob(jobId, jobData, 'pending');
+
+    // Build recipe prompt
     const fullPrompt = researchContext 
       ? `Based on this research:\n\n${researchContext}\n\n---\n\nNow, ${prompt}`
       : prompt;
@@ -113,33 +153,23 @@ Provide your response in this format:
 English: [filename].md
 Spanish: [filename].md`;
 
-    // Generate recipe with Claude CLI (headless mode)
+    // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
-    let response;
-    try {
-      const { stdout, stderr } = await execPromise(`claude -p '${escapedRecipePrompt}'`);
-      if (stderr) console.error('Claude stderr:', stderr);
-      response = stdout.trim();
-      console.log('Recipe generated via Claude CLI');
-    } catch (error) {
-      return res.status(500).json({ 
-        error: 'Claude CLI failed', 
-        details: error.message 
-      });
-    }
+    const { stdout, stderr } = await execPromise(`claude -p '${escapedRecipePrompt}'`, {
+      timeout: 180000 // 3 minute timeout
+    });
+    if (stderr) console.error('Claude stderr:', stderr);
+    const response = stdout.trim();
+    console.log(`[Job ${jobId}] Recipe generated`);
 
-    // Parse the response
+    // Parse response
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
     const spanishMatch = response.match(/===SPANISH===\n([\s\S]*?)===FILENAMES===/);
     const filenamesMatch = response.match(/===FILENAMES===\n([\s\S]*?)$/);
 
     if (!englishMatch || !spanishMatch) {
-      return res.json({
-        success: false,
-        message: 'Generated content but could not parse recipe format',
-        rawResponse: response
-      });
+      throw new Error('Failed to parse recipe format from AI response');
     }
 
     const englishRecipe = englishMatch[1].trim();
@@ -156,8 +186,12 @@ Spanish: [filename].md`;
       if (spaMatch) spanishFilename = spaMatch[1].trim();
     }
 
-    res.json({
-      success: true,
+    // Job complete - move to completed
+    const completedData = {
+      ...jobData,
+      status: 'completed',
+      progress: 'Recipe generated successfully',
+      completedAt: new Date().toISOString(),
       recipes: {
         english: {
           content: englishRecipe,
@@ -169,21 +203,286 @@ Spanish: [filename].md`;
           filename: spanishFilename,
           path: `recipes/spanish/recipes/${spanishFilename}`
         }
-      },
-      researchContext: researchContext || null,
-      usedResearch: !!researchContext
+      }
+    };
+
+    await writeJob(jobId, completedData, 'completed');
+    await deleteJob(jobId); // Remove from pending
+    runningJobs.delete(jobId);
+    
+    console.log(`[Job ${jobId}] Completed successfully`);
+
+  } catch (error) {
+    console.error(`[Job ${jobId}] Failed:`, error);
+    
+    // Move to failed
+    const failedData = {
+      ...jobData,
+      status: 'failed',
+      error: error.message,
+      failedAt: new Date().toISOString()
+    };
+    
+    await writeJob(jobId, failedData, 'failed');
+    await deleteJob(jobId); // Remove from pending
+    runningJobs.delete(jobId);
+  }
+};
+
+// Routes
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Start recipe generation (returns jobId immediately)
+app.post('/api/generate-recipe', async (req, res) => {
+  try {
+    const { prompt, researchQuery } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    // Create job
+    const jobId = Date.now().toString();
+    const jobData = {
+      jobId,
+      prompt,
+      researchQuery: researchQuery || null,
+      status: 'pending',
+      progress: 'Starting...',
+      createdAt: new Date().toISOString()
+    };
+
+    await writeJob(jobId, jobData, 'pending');
+
+    // Start processing in background (don't await)
+    processJob(jobId, jobData).catch(err => {
+      console.error(`Background job ${jobId} error:`, err);
+    });
+
+    // Return immediately
+    res.json({ 
+      success: true,
+      jobId 
     });
 
   } catch (error) {
-    console.error('Error generating recipe:', error);
+    console.error('Error starting job:', error);
     res.status(500).json({ 
-      error: 'Failed to generate recipe', 
+      error: 'Failed to start job', 
       details: error.message 
     });
   }
 });
 
-// Save recipe and commit to git
+// Get job status
+app.get('/api/job/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = await readJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    res.json(job);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List all jobs
+app.get('/api/jobs', async (req, res) => {
+  try {
+    const readJobsFromFolder = async (folder) => {
+      try {
+        const files = await fs.readdir(path.join(JOBS_PATH, folder));
+        const jobs = await Promise.all(
+          files
+            .filter(f => f.endsWith('.json'))
+            .map(async (file) => {
+              const data = await fs.readFile(path.join(JOBS_PATH, folder, file), 'utf8');
+              return JSON.parse(data);
+            })
+        );
+        return jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const [pending, completed, failed] = await Promise.all([
+      readJobsFromFolder('pending'),
+      readJobsFromFolder('completed'),
+      readJobsFromFolder('failed')
+    ]);
+
+    res.json({
+      pending,
+      drafts: completed, // completed = drafts (not yet committed)
+      failed
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Commit a draft (save to recipes folder and commit to git)
+app.post('/api/job/:jobId/commit', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { commitMessage } = req.body;
+    
+    const job = await readJob(jobId);
+    
+    if (!job || job.folder !== 'completed') {
+      return res.status(404).json({ error: 'Draft not found' });
+    }
+
+    const { recipes } = job;
+
+    // Save English recipe
+    const englishPath = path.join(REPO_PATH, recipes.english.path);
+    await fs.mkdir(path.dirname(englishPath), { recursive: true });
+    await fs.writeFile(englishPath, recipes.english.content, 'utf8');
+
+    // Save Spanish recipe
+    const spanishPath = path.join(REPO_PATH, recipes.spanish.path);
+    await fs.mkdir(path.dirname(spanishPath), { recursive: true });
+    await fs.writeFile(spanishPath, recipes.spanish.content, 'utf8');
+
+    // Regenerate manifest
+    await new Promise((resolve, reject) => {
+      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+
+    // Git operations
+    await git.add([
+      recipes.english.path,
+      recipes.spanish.path,
+      'frontend/index.html',
+      'frontend/service-worker.js'
+    ]);
+
+    const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
+    await git.commit(message);
+
+    // Push to GitHub
+    if (GITHUB_TOKEN) {
+      await git.addConfig('credential.helper', 'store');
+    }
+    await git.push(GITHUB_REPO, 'main');
+
+    // Move job to committed
+    await moveJob(jobId, 'completed', 'committed');
+
+    res.json({
+      success: true,
+      message: 'Recipe committed and pushed to GitHub'
+    });
+
+  } catch (error) {
+    console.error('Error committing job:', error);
+    res.status(500).json({ 
+      error: 'Failed to commit recipe', 
+      details: error.message 
+    });
+  }
+});
+
+// Delete a job
+app.delete('/api/job/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const success = await deleteJob(jobId);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Cancel if running
+    if (runningJobs.has(jobId)) {
+      const proc = runningJobs.get(jobId);
+      proc.kill();
+      runningJobs.delete(jobId);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel a running job
+app.post('/api/job/:jobId/cancel', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    if (runningJobs.has(jobId)) {
+      const proc = runningJobs.get(jobId);
+      proc.kill();
+      runningJobs.delete(jobId);
+    }
+
+    await deleteJob(jobId);
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Retry a failed job
+app.post('/api/job/:jobId/retry', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = await readJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Create new job with same data
+    const newJobId = Date.now().toString();
+    const newJobData = {
+      jobId: newJobId,
+      prompt: job.prompt,
+      researchQuery: job.researchQuery,
+      status: 'pending',
+      progress: 'Starting (retry)...',
+      createdAt: new Date().toISOString(),
+      retriedFrom: jobId
+    };
+
+    await writeJob(newJobId, newJobData, 'pending');
+
+    // Start processing
+    processJob(newJobId, newJobData).catch(err => {
+      console.error(`Retry job ${newJobId} error:`, err);
+    });
+
+    // Delete old failed job
+    await deleteJob(jobId);
+
+    res.json({ 
+      success: true, 
+      newJobId 
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Legacy endpoints for backward compatibility
+
+// Save recipe and commit to git (legacy)
 app.post('/api/save-recipe', async (req, res) => {
   try {
     const { recipes, commitMessage } = req.body;
@@ -203,11 +502,10 @@ app.post('/api/save-recipe', async (req, res) => {
     await fs.writeFile(spanishPath, recipes.spanish.content, 'utf8');
 
     // Regenerate index
-    const { exec } = require('child_process');
     await new Promise((resolve, reject) => {
-      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error, stdout, stderr) => {
+      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error) => {
         if (error) reject(error);
-        else resolve(stdout);
+        else resolve();
       });
     });
 
@@ -241,7 +539,6 @@ app.post('/api/save-recipe', async (req, res) => {
 app.post('/api/git/push', async (req, res) => {
   try {
     if (GITHUB_TOKEN) {
-      // Configure git with token
       await git.addConfig('credential.helper', 'store');
     }
 
@@ -333,8 +630,6 @@ app.listen(PORT, () => {
   console.log(`🍳 Recipe Server running on port ${PORT}`);
   console.log(`📝 Repository path: ${REPO_PATH}`);
   console.log(`📚 Recipes path: ${RECIPES_PATH}`);
-  console.log(`🎨 Frontend path: ${FRONTEND_PATH}`);
-  console.log(`🔑 Anthropic API: ${ANTHROPIC_API_KEY ? 'Configured' : 'Not configured'}`);
+  console.log(`💼 Jobs path: ${JOBS_PATH}`);
   console.log(`🐙 GitHub Token: ${GITHUB_TOKEN ? 'Configured' : 'Not configured'}`);
 });
-

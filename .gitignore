@@ -16,3 +16,6 @@ backend/.env
 *.log
 npm-debug.log*
 
+# Job queue (temporary files)
+backend/.jobs/
+

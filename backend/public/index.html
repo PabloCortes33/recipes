@@ -180,7 +180,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>🍳 AI Recipe Generator</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; flex-wrap: wrap; gap: 1em;">
+            <h1 style="margin: 0;">🍳 AI Recipe Generator</h1>
+            <a href="/jobs.html" class="btn btn-secondary">📝 View Jobs</a>
+        </div>
         
         <!-- Authentication Section -->
         <div id="auth-section" class="auth-section hidden">
@@ -252,6 +255,8 @@
             }
         }
         
+        let pollInterval = null;
+        
         async function generateRecipe() {
             const researchQuery = document.getElementById('research-query').value;
             const prompt = document.getElementById('recipe-prompt').value;
@@ -261,45 +266,109 @@
                 return;
             }
             
-            const statusMsg = researchQuery 
-                ? 'Researching with Gemini, then generating recipe with Claude CLI...'
-                : 'Generating recipe with Claude CLI...';
+            const statusMsg = 'Starting recipe generation...';
             showStatus('generation-status', statusMsg, 'info');
             document.getElementById('generate-btn').disabled = true;
-            document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>AI is creating your recipe...</p></div>';
+            document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>Starting job...</p></div>';
             document.getElementById('recipe-preview').classList.remove('hidden');
             
             try {
+                // Start job
                 const response = await fetch('/api/generate-recipe', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ prompt, researchQuery })
                 });
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    currentRecipes = data.recipes;
-                    displayRecipePreview(data.recipes, data.usedResearch);
-                    const successMsg = data.usedResearch 
-                        ? 'Recipe generated successfully (Gemini research + Claude CLI)!'
-                        : 'Recipe generated successfully (Claude CLI)!';
-                    showStatus('generation-status', successMsg, 'success');
-                    document.getElementById('git-controls').classList.remove('hidden');
+                if (data.success && data.jobId) {
+                    // Save jobId to localStorage (for recovery)
+                    localStorage.setItem('currentJobId', data.jobId);
+                    
+                    // Start polling for status
+                    pollJobStatus(data.jobId);
                 } else {
-                    showStatus('generation-status', 'Failed to generate recipe', 'error');
+                    showStatus('generation-status', 'Failed to start job', 'error');
                     document.getElementById('recipe-preview').classList.add('hidden');
+                    document.getElementById('generate-btn').disabled = false;
                 }
             } catch (error) {
                 showStatus('generation-status', 'Error: ' + error.message, 'error');
                 document.getElementById('recipe-preview').classList.add('hidden');
-            } finally {
                 document.getElementById('generate-btn').disabled = false;
             }
         }
+        
+        async function pollJobStatus(jobId) {
+            // Clear any existing poll
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+            
+            // Poll every 2 seconds
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/job/${jobId}`);
+                    const job = await response.json();
+                    
+                    if (job.status === 'pending' || job.status === 'researching' || job.status === 'generating') {
+                        // Still in progress
+                        const messages = {
+                            'pending': 'Starting...',
+                            'researching': '🔷 Researching with Gemini...',
+                            'generating': '🤖 Generating recipe with Claude CLI...'
+                        };
+                        showStatus('generation-status', job.progress || messages[job.status], 'info');
+                        document.getElementById('recipe-preview').innerHTML = `<div class="loading"><div class="spinner"></div><p>${job.progress || messages[job.status]}</p></div>`;
+                    } else if (job.status === 'completed') {
+                        // Job complete!
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        localStorage.removeItem('currentJobId');
+                        
+                        currentRecipes = job.recipes;
+                        displayRecipePreview(job.recipes, job.researchContext);
+                        
+                        const successMsg = job.researchContext 
+                            ? 'Recipe generated successfully (Gemini research + Claude CLI)!'
+                            : 'Recipe generated successfully (Claude CLI)!';
+                        showStatus('generation-status', successMsg + ' <a href="/jobs.html" style="margin-left: 1em;">View in Jobs Dashboard</a>', 'success');
+                        document.getElementById('git-controls').classList.remove('hidden');
+                        document.getElementById('generate-btn').disabled = false;
+                    } else if (job.status === 'failed') {
+                        // Job failed
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        localStorage.removeItem('currentJobId');
+                        
+                        showStatus('generation-status', `❌ Failed: ${job.error}. <a href="/jobs.html">View in Jobs Dashboard</a>`, 'error');
+                        document.getElementById('recipe-preview').classList.add('hidden');
+                        document.getElementById('generate-btn').disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000);
+        }
+        
+        // Check for in-progress job on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedJobId = localStorage.getItem('currentJobId');
+            if (savedJobId) {
+                const resume = confirm('You have an in-progress job. Resume watching it?');
+                if (resume) {
+                    showStatus('generation-status', 'Resuming job...', 'info');
+                    document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>Checking job status...</p></div>';
+                    document.getElementById('recipe-preview').classList.remove('hidden');
+                    pollJobStatus(savedJobId);
+                } else {
+                    localStorage.removeItem('currentJobId');
+                }
+            }
+        });
         
         function displayRecipePreview(recipes, usedResearch) {
             const preview = document.getElementById('recipe-preview');

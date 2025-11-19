@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Jobs</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 1em;
+        }
+        
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1em;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 1.8em;
+        }
+        
+        .btn {
+            padding: 0.6em 1.2em;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #007BFF;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-small {
+            padding: 0.4em 0.8em;
+            font-size: 0.85em;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5em;
+            margin-bottom: 2em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 1.3em;
+            margin-bottom: 1em;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+        
+        .badge {
+            background: #666;
+            color: white;
+            padding: 0.2em 0.6em;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+        
+        .job-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 1em;
+            margin-bottom: 1em;
+        }
+        
+        .job-card:last-child {
+            margin-bottom: 0;
+        }
+        
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5em;
+            flex-wrap: wrap;
+            gap: 0.5em;
+        }
+        
+        .job-id {
+            font-size: 0.9em;
+            color: #666;
+            font-family: monospace;
+        }
+        
+        .job-status {
+            padding: 0.3em 0.7em;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-researching {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status-generating {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .job-content {
+            margin: 1em 0;
+        }
+        
+        .job-prompt {
+            font-size: 1em;
+            color: #333;
+            margin-bottom: 0.5em;
+        }
+        
+        .job-research {
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .job-time {
+            font-size: 0.85em;
+            color: #999;
+        }
+        
+        .job-actions {
+            margin-top: 1em;
+            display: flex;
+            gap: 0.5em;
+            flex-wrap: wrap;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 2em;
+            color: #999;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2em;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007BFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1em;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .recipe-preview {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 1em;
+            margin-top: 1em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .recipe-preview pre {
+            white-space: pre-wrap;
+            font-size: 0.85em;
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5em; }
+            .header { flex-direction: column; align-items: stretch; }
+            .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍳 Recipe Jobs</h1>
+        <div>
+            <a href="/" class="btn btn-primary">➕ New Recipe</a>
+            <button class="btn btn-secondary" onclick="loadJobs()">🔄 Refresh</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading jobs...</p>
+        </div>
+        
+        <!-- Pending Jobs -->
+        <div id="pending-section" class="section" style="display: none;">
+            <div class="section-title">
+                ⏳ In Progress
+                <span class="badge" id="pending-count">0</span>
+            </div>
+            <div id="pending-jobs"></div>
+        </div>
+        
+        <!-- Drafts (Completed but not committed) -->
+        <div id="drafts-section" class="section" style="display: none;">
+            <div class="section-title">
+                📝 Drafts - Ready to Commit
+                <span class="badge" id="drafts-count">0</span>
+            </div>
+            <div id="drafts-jobs"></div>
+        </div>
+        
+        <!-- Failed Jobs -->
+        <div id="failed-section" class="section" style="display: none;">
+            <div class="section-title">
+                ❌ Failed Jobs
+                <span class="badge" id="failed-count">0</span>
+            </div>
+            <div id="failed-jobs"></div>
+        </div>
+    </div>
+    
+    <script>
+        let autoRefreshInterval = null;
+        
+        function formatTimeAgo(timestamp) {
+            const now = new Date();
+            const then = new Date(timestamp);
+            const seconds = Math.floor((now - then) / 1000);
+            
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+        
+        function renderPendingJob(job) {
+            const statusClass = job.status === 'researching' ? 'status-researching' : 
+                                job.status === 'generating' ? 'status-generating' : 'status-pending';
+            
+            return `
+                <div class="job-card">
+                    <div class="job-header">
+                        <span class="job-id">Job #${job.jobId}</span>
+                        <span class="job-status ${statusClass}">${job.progress || job.status}</span>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-prompt">📄 ${job.prompt}</div>
+                        ${job.researchQuery ? `<div class="job-research">🔷 Research: ${job.researchQuery}</div>` : ''}
+                        <div class="job-time">Started: ${formatTimeAgo(job.createdAt)}</div>
+                    </div>
+                    <div class="job-actions">
+                        <button class="btn btn-danger btn-small" onclick="cancelJob('${job.jobId}')">Cancel</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderDraftJob(job) {
+            return `
+                <div class="job-card">
+                    <div class="job-header">
+                        <span class="job-id">Job #${job.jobId}</span>
+                        <span class="job-status status-completed">✅ Ready</span>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-prompt">📄 ${job.recipes.english.filename}</div>
+                        ${job.researchQuery ? `<div class="job-research">🔷 Used research: ${job.researchQuery}</div>` : ''}
+                        <div class="job-time">Completed: ${formatTimeAgo(job.completedAt)}</div>
+                    </div>
+                    <div class="job-actions">
+                        <button class="btn btn-primary btn-small" onclick="viewRecipe('${job.jobId}')">👁️ View Recipe</button>
+                        <button class="btn btn-success btn-small" onclick="commitJob('${job.jobId}')">✅ Commit & Push</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteJob('${job.jobId}')">🗑️ Delete</button>
+                    </div>
+                    <div id="recipe-preview-${job.jobId}" style="display: none;"></div>
+                </div>
+            `;
+        }
+        
+        function renderFailedJob(job) {
+            return `
+                <div class="job-card">
+                    <div class="job-header">
+                        <span class="job-id">Job #${job.jobId}</span>
+                        <span class="job-status status-failed">❌ Failed</span>
+                    </div>
+                    <div class="job-content">
+                        <div class="job-prompt">📄 ${job.prompt}</div>
+                        ${job.researchQuery ? `<div class="job-research">🔷 Research: ${job.researchQuery}</div>` : ''}
+                        <div class="job-time">Failed: ${formatTimeAgo(job.failedAt)}</div>
+                        <div style="color: #dc3545; margin-top: 0.5em; font-size: 0.9em;">
+                            Error: ${job.error}
+                        </div>
+                    </div>
+                    <div class="job-actions">
+                        <button class="btn btn-primary btn-small" onclick="retryJob('${job.jobId}')">🔄 Retry</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteJob('${job.jobId}')">🗑️ Delete</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function loadJobs() {
+            try {
+                const response = await fetch('/api/jobs');
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                // Pending jobs
+                const pendingSection = document.getElementById('pending-section');
+                const pendingJobs = document.getElementById('pending-jobs');
+                const pendingCount = document.getElementById('pending-count');
+                
+                if (data.pending && data.pending.length > 0) {
+                    pendingSection.style.display = 'block';
+                    pendingCount.textContent = data.pending.length;
+                    pendingJobs.innerHTML = data.pending.map(renderPendingJob).join('');
+                } else {
+                    pendingSection.style.display = 'none';
+                }
+                
+                // Drafts
+                const draftsSection = document.getElementById('drafts-section');
+                const draftsJobs = document.getElementById('drafts-jobs');
+                const draftsCount = document.getElementById('drafts-count');
+                
+                if (data.drafts && data.drafts.length > 0) {
+                    draftsSection.style.display = 'block';
+                    draftsCount.textContent = data.drafts.length;
+                    draftsJobs.innerHTML = data.drafts.map(renderDraftJob).join('');
+                } else {
+                    draftsSection.style.display = 'none';
+                }
+                
+                // Failed jobs
+                const failedSection = document.getElementById('failed-section');
+                const failedJobs = document.getElementById('failed-jobs');
+                const failedCount = document.getElementById('failed-count');
+                
+                if (data.failed && data.failed.length > 0) {
+                    failedSection.style.display = 'block';
+                    failedCount.textContent = data.failed.length;
+                    failedJobs.innerHTML = data.failed.map(renderFailedJob).join('');
+                } else {
+                    failedSection.style.display = 'none';
+                }
+                
+                // Show empty state if no jobs
+                if ((!data.pending || data.pending.length === 0) &&
+                    (!data.drafts || data.drafts.length === 0) &&
+                    (!data.failed || data.failed.length === 0)) {
+                    document.getElementById('loading').innerHTML = '<p class="empty-state">No jobs yet. Create your first recipe!</p>';
+                    document.getElementById('loading').style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Error loading jobs:', error);
+                document.getElementById('loading').innerHTML = '<p style="color: red;">Error loading jobs. Please refresh.</p>';
+            }
+        }
+        
+        async function viewRecipe(jobId) {
+            const previewDiv = document.getElementById(`recipe-preview-${jobId}`);
+            
+            if (previewDiv.style.display === 'block') {
+                previewDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/job/${jobId}`);
+                const job = await response.json();
+                
+                previewDiv.innerHTML = `
+                    <div class="recipe-preview">
+                        <h4>🇬🇧 English: ${job.recipes.english.filename}</h4>
+                        <pre>${job.recipes.english.content.substring(0, 500)}...</pre>
+                        <br>
+                        <h4>🇪🇸 Spanish: ${job.recipes.spanish.filename}</h4>
+                        <pre>${job.recipes.spanish.content.substring(0, 500)}...</pre>
+                    </div>
+                `;
+                previewDiv.style.display = 'block';
+            } catch (error) {
+                alert('Error loading recipe: ' + error.message);
+            }
+        }
+        
+        async function commitJob(jobId) {
+            if (!confirm('Commit this recipe and push to GitHub?')) return;
+            
+            try {
+                const response = await fetch(`/api/job/${jobId}/commit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ commitMessage: '' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Recipe committed and pushed to GitHub!');
+                    loadJobs();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error committing recipe: ' + error.message);
+            }
+        }
+        
+        async function cancelJob(jobId) {
+            if (!confirm('Cancel this job?')) return;
+            
+            try {
+                await fetch(`/api/job/${jobId}/cancel`, { method: 'POST' });
+                loadJobs();
+            } catch (error) {
+                alert('Error canceling job: ' + error.message);
+            }
+        }
+        
+        async function deleteJob(jobId) {
+            if (!confirm('Delete this job permanently?')) return;
+            
+            try {
+                await fetch(`/api/job/${jobId}`, { method: 'DELETE' });
+                loadJobs();
+            } catch (error) {
+                alert('Error deleting job: ' + error.message);
+            }
+        }
+        
+        async function retryJob(jobId) {
+            try {
+                const response = await fetch(`/api/job/${jobId}/retry`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Job restarted!');
+                    loadJobs();
+                }
+            } catch (error) {
+                alert('Error retrying job: ' + error.message);
+            }
+        }
+        
+        // Auto-refresh every 5 seconds if there are pending jobs
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            autoRefreshInterval = setInterval(() => {
+                loadJobs();
+            }, 5000);
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+        
+        // Load jobs on page load
+        loadJobs();
+        startAutoRefresh();
+        
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        });
+    </script>
+</body>
+</html>
+
