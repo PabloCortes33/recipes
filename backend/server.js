@@ -425,13 +425,27 @@ app.post('/api/job/:jobId/commit', async (req, res) => {
     const { jobId } = req.params;
     const { commitMessage } = req.body;
     
+    console.log(`[Commit] Starting commit for job ${jobId}`);
+    
     const job = await readJob(jobId);
     
-    if (!job || job.folder !== 'completed') {
-      return res.status(404).json({ error: 'Draft not found' });
+    if (!job) {
+      console.error(`[Commit] Job ${jobId} not found`);
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    if (job.folder !== 'completed') {
+      console.error(`[Commit] Job ${jobId} is not completed (folder: ${job.folder})`);
+      return res.status(400).json({ error: `Job is not completed. Current status: ${job.folder}` });
+    }
+
+    if (!job.recipes || !job.recipes.english || !job.recipes.spanish) {
+      console.error(`[Commit] Job ${jobId} missing recipes data`);
+      return res.status(400).json({ error: 'Job missing recipe data' });
     }
 
     const { recipes } = job;
+    console.log(`[Commit] Recipes found: ${recipes.english.filename}, ${recipes.spanish.filename}`);
 
     // Save English recipe
     const englishPath = path.join(REPO_PATH, recipes.english.path);
@@ -444,37 +458,75 @@ app.post('/api/job/:jobId/commit', async (req, res) => {
     await fs.writeFile(spanishPath, recipes.spanish.content, 'utf8');
 
     // Regenerate manifest
-    await new Promise((resolve, reject) => {
-      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error) => {
-        if (error) reject(error);
-        else resolve();
+    try {
+      await new Promise((resolve, reject) => {
+        exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error, stdout, stderr) => {
+          if (error) {
+            console.error('Manifest generation error:', error);
+            console.error('Manifest stderr:', stderr);
+            reject(error);
+          } else {
+            console.log('Manifest generated successfully');
+            resolve();
+          }
+        });
       });
-    });
+    } catch (error) {
+      console.error('Failed to regenerate manifest:', error);
+      // Continue anyway - recipes are saved
+    }
 
     // Git operations
-    await git.add([
-      recipes.english.path,
-      recipes.spanish.path,
-      'frontend/index.html',
-      'frontend/service-worker.js'
-    ]);
+    try {
+      await git.add([
+        recipes.english.path,
+        recipes.spanish.path,
+        'frontend/index.html',
+        'frontend/service-worker.js'
+      ]);
 
-    const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
-    await git.commit(message);
+      const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
+      await git.commit(message);
+      console.log(`Committed: ${message}`);
 
-    // Push to GitHub
-    if (GITHUB_TOKEN) {
-      await git.addConfig('credential.helper', 'store');
+      // Push to GitHub
+      try {
+        console.log(`[Commit] Attempting to push to ${GITHUB_REPO}/main`);
+        
+        // Configure git remote URL with token if available
+        if (GITHUB_TOKEN) {
+          const remoteUrl = `https://${GITHUB_TOKEN}@github.com/PabloCortes33/recipes.git`;
+          await git.remote(['set-url', 'origin', remoteUrl]);
+          console.log('[Commit] Configured git remote with token');
+        }
+        
+        await git.push(GITHUB_REPO, 'main');
+        console.log('[Commit] Pushed to GitHub successfully');
+      } catch (pushError) {
+        console.error('[Commit] Git push failed:', pushError);
+        console.error('[Commit] Push error details:', pushError.message);
+        // Don't fail the whole operation if push fails - recipe is still committed
+        // Move job to committed anyway
+        await moveJob(jobId, 'completed', 'committed');
+        return res.json({
+          success: true,
+          message: 'Recipe committed locally. Push to GitHub failed - you can push manually.',
+          warning: pushError.message,
+          error: pushError.message
+        });
+      }
+
+      // Move job to committed
+      await moveJob(jobId, 'completed', 'committed');
+
+      res.json({
+        success: true,
+        message: 'Recipe committed and pushed to GitHub'
+      });
+    } catch (gitError) {
+      console.error('Git operation failed:', gitError);
+      throw gitError;
     }
-    await git.push(GITHUB_REPO, 'main');
-
-    // Move job to committed
-    await moveJob(jobId, 'completed', 'committed');
-
-    res.json({
-      success: true,
-      message: 'Recipe committed and pushed to GitHub'
-    });
 
   } catch (error) {
     console.error('Error committing job:', error);
@@ -627,8 +679,11 @@ app.post('/api/save-recipe', async (req, res) => {
 // Push to GitHub
 app.post('/api/git/push', async (req, res) => {
   try {
+    // Configure git remote URL with token if available
     if (GITHUB_TOKEN) {
-      await git.addConfig('credential.helper', 'store');
+      const remoteUrl = `https://${GITHUB_TOKEN}@github.com/PabloCortes33/recipes.git`;
+      await git.remote(['set-url', 'origin', remoteUrl]);
+      console.log('[Git Push] Configured git remote with token');
     }
 
     await git.push(GITHUB_REPO, 'main');
