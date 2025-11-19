@@ -132,9 +132,7 @@ const processJob = async (jobId, jobData) => {
       ? `Based on this research:\n\n${researchContext}\n\n---\n\nNow, ${prompt}`
       : prompt;
 
-    const recipePrompt = `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe:
-1. English version (save as recipes/english/recipes/[recipe_name].md)
-2. Spanish version (save as recipes/spanish/recipes/[recipe_name].md)
+    const recipePrompt = `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe in markdown format.
 
 For each version:
 - Use proper markdown format
@@ -144,14 +142,17 @@ For each version:
 - Use the same structure as existing recipes in the collection
 - Keep the recipe name consistent between versions (translated)
 
-Provide your response in this format:
+You MUST provide your response EXACTLY in this format (output the content, do not try to save files):
+
 ===ENGLISH===
-[full recipe markdown]
+[full English recipe markdown content here]
 ===SPANISH===
-[full recipe markdown]
+[full Spanish recipe markdown content here]
 ===FILENAMES===
-English: [filename].md
-Spanish: [filename].md`;
+English: [suggested_filename].md
+Spanish: [suggested_filename].md
+
+Do not add any other text before or after this format. Just output the recipes in this exact structure.`;
 
     // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
