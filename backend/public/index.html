@@ -198,11 +198,26 @@
         <!-- Main Application -->
         <div id="main-section" class="main-section">
             
+            <!-- Mode Toggle -->
+            <div class="form-group" style="margin-bottom: 1.5em;">
+                <label style="margin-bottom: 0.5em;">Mode:</label>
+                <div style="display: flex; gap: 1em; align-items: center;">
+                    <label style="display: flex; align-items: center; cursor: pointer; font-weight: normal;">
+                        <input type="radio" name="mode" value="create" checked onchange="updateMode()" style="margin-right: 0.5em; width: auto;">
+                        <span>✨ Create Recipe</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; font-weight: normal;">
+                        <input type="radio" name="mode" value="store" onchange="updateMode()" style="margin-right: 0.5em; width: auto;">
+                        <span>📝 Store Recipe</span>
+                    </label>
+                </div>
+            </div>
+            
             <!-- Recipe Generation Form -->
             <div class="form-group">
-                <label for="recipe-prompt">What recipe would you like to create?</label>
+                <label id="prompt-label" for="recipe-prompt">What recipe would you like to create?</label>
                 <textarea id="recipe-prompt" placeholder="Example: roasted capsicum dip with peanuts"></textarea>
-                <small style="color: #666;">🔷 Automatically researches with Gemini, then 🤖 generates recipe with Claude CLI</small>
+                <small id="prompt-help" style="color: #666;">🔷 Automatically researches with Gemini, then 🤖 generates recipe with Claude CLI</small>
             </div>
             
             <button class="btn btn-primary" onclick="generateRecipe()" id="generate-btn">
@@ -228,6 +243,29 @@
     <script>
         let authToken = 'no-auth-needed'; // Default token (bypasses auth)
         let currentRecipes = null;
+        let currentMode = 'create'; // 'create' or 'store'
+        
+        function updateMode() {
+            const modeRadios = document.querySelectorAll('input[name="mode"]');
+            currentMode = Array.from(modeRadios).find(r => r.checked)?.value || 'create';
+            
+            const promptLabel = document.getElementById('prompt-label');
+            const promptInput = document.getElementById('recipe-prompt');
+            const promptHelp = document.getElementById('prompt-help');
+            const generateBtn = document.getElementById('generate-btn');
+            
+            if (currentMode === 'create') {
+                promptLabel.textContent = 'What recipe would you like to create?';
+                promptInput.placeholder = 'Example: roasted capsicum dip with peanuts';
+                promptHelp.textContent = '🔷 Automatically researches with Gemini, then 🤖 generates recipe with Claude CLI';
+                generateBtn.textContent = '🤖 Generate Recipe';
+            } else {
+                promptLabel.textContent = 'Paste the recipe you want to store:';
+                promptInput.placeholder = 'Paste your recipe here (from Instagram, website, etc.)...';
+                promptHelp.textContent = '🤖 Claude CLI will organize and format it to match your recipe collection structure';
+                generateBtn.textContent = '📝 Format & Store Recipe';
+            }
+        }
         
         async function authenticate() {
             const password = document.getElementById('auth-password').value;
@@ -256,24 +294,29 @@
             const prompt = document.getElementById('recipe-prompt').value.trim();
             
             if (!prompt) {
-                showStatus('generation-status', 'Please enter what recipe you want to create', 'error');
+                const errorMsg = currentMode === 'create' 
+                    ? 'Please enter what recipe you want to create' 
+                    : 'Please paste the recipe you want to store';
+                showStatus('generation-status', errorMsg, 'error');
                 return;
             }
             
-            const statusMsg = 'Starting recipe generation...';
+            const statusMsg = currentMode === 'create' 
+                ? 'Starting recipe generation...' 
+                : 'Starting recipe formatting...';
             showStatus('generation-status', statusMsg, 'info');
             document.getElementById('generate-btn').disabled = true;
             document.getElementById('recipe-preview').innerHTML = '<div class="loading"><div class="spinner"></div><p>Starting job...</p></div>';
             document.getElementById('recipe-preview').classList.remove('hidden');
             
             try {
-                // Start job (backend will automatically generate research query from prompt)
+                // Start job with mode
                 const response = await fetch('/api/generate-recipe', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify({ prompt, mode: currentMode })
                 });
                 
                 const data = await response.json();
@@ -308,12 +351,13 @@
                     const response = await fetch(`/api/job/${jobId}`);
                     const job = await response.json();
                     
-                    if (job.status === 'pending' || job.status === 'researching' || job.status === 'generating') {
+                    if (job.status === 'pending' || job.status === 'researching' || job.status === 'generating' || job.status === 'formatting') {
                         // Still in progress
                         const messages = {
                             'pending': 'Starting...',
                             'researching': '🔷 Researching with Gemini...',
-                            'generating': '🤖 Generating recipe with Claude CLI...'
+                            'generating': '🤖 Generating recipe with Claude CLI...',
+                            'formatting': '🤖 Formatting recipe with Claude CLI...'
                         };
                         showStatus('generation-status', job.progress || messages[job.status], 'info');
                         document.getElementById('recipe-preview').innerHTML = `<div class="loading"><div class="spinner"></div><p>${job.progress || messages[job.status]}</p></div>`;
@@ -324,9 +368,11 @@
                         localStorage.removeItem('currentJobId');
                         
                         currentRecipes = job.recipes;
-                        displayRecipePreview(job.recipes, job.researchContext);
+                        displayRecipePreview(job.recipes, job.researchContext, job.mode);
                         
-                        const successMsg = 'Recipe generated successfully! 🔷 Gemini research → 🤖 Claude CLI generation';
+                        const successMsg = job.mode === 'create'
+                            ? 'Recipe generated successfully! 🔷 Gemini research → 🤖 Claude CLI generation'
+                            : 'Recipe formatted successfully! 🤖 Claude CLI formatting';
                         showStatus('generation-status', successMsg + ' <a href="/jobs.html" style="margin-left: 1em;">View in Jobs Dashboard</a>', 'success');
                         document.getElementById('git-controls').classList.remove('hidden');
                         document.getElementById('generate-btn').disabled = false;
@@ -362,11 +408,14 @@
             }
         });
         
-        function displayRecipePreview(recipes, usedResearch) {
+        function displayRecipePreview(recipes, usedResearch, mode) {
             const preview = document.getElementById('recipe-preview');
+            const subtitle = mode === 'create'
+                ? '🔷 Gemini Research → 🤖 Claude CLI Generation'
+                : '🤖 Claude CLI Formatting';
             preview.innerHTML = `
-                <h3>Generated Recipes</h3>
-                <p style="color: #666; font-size: 0.9em; margin-top: -0.5em;">🔷 Gemini Research → 🤖 Claude CLI Generation</p>
+                <h3>${mode === 'create' ? 'Generated' : 'Formatted'} Recipes</h3>
+                <p style="color: #666; font-size: 0.9em; margin-top: -0.5em;">${subtitle}</p>
                 <div style="margin-bottom: 2em;">
                     <h4>🇬🇧 English: ${recipes.english.filename}</h4>
                     <pre>${recipes.english.content}</pre>

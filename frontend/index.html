@@ -873,14 +873,17 @@ const RECIPES_DATA = {
 
 let expandedFolders = new Set();
 
-function createFolderElement(item, level = 0) {
+function createFolderElement(item, level = 0, isSpanish = false) {
   const folder = document.createElement('div');
   folder.className = 'folder';
+  
+  // Check if this is in Spanish section (check path or parent context)
+  const inSpanishSection = isSpanish || item.path.includes('/spanish/');
   
   const folderName = document.createElement('div');
   folderName.className = 'folder-name';
   const isExpanded = expandedFolders.has(item.path);
-  folderName.innerHTML = `<span class="folder-icon">${isExpanded ? '📂' : '📁'}</span>${formatName(item.name)}`;
+  folderName.innerHTML = `<span class="folder-icon">${isExpanded ? '📂' : '📁'}</span>${formatName(item.name, inSpanishSection)}`;
   
   const contents = document.createElement('div');
   contents.className = `folder-contents ${isExpanded ? '' : 'collapsed'}`;
@@ -901,7 +904,7 @@ function createFolderElement(item, level = 0) {
   if (item.children) {
     item.children.forEach(child => {
       if (child.type === 'folder') {
-        contents.appendChild(createFolderElement(child, level + 1));
+        contents.appendChild(createFolderElement(child, level + 1, inSpanishSection));
       } else {
         contents.appendChild(createFileElement(child));
       }
@@ -929,7 +932,21 @@ function createFileElement(item) {
   return file;
 }
 
-function formatName(name) {
+function formatName(name, isSpanish = false) {
+  // Category translations
+  const translations = {
+    'bakery': 'panadería',
+    'methods': 'métodos',
+    'recipes': 'recetas',
+    'sauces': 'salsas',
+    'spices': 'especias'
+  };
+  
+  // Translate category names if in Spanish section
+  if (isSpanish && translations[name.toLowerCase()]) {
+    return translations[name.toLowerCase()];
+  }
+  
   return name
     .replace(/_/g, ' ')
     .replace(/\b\w/g, l => l.toUpperCase());
@@ -945,13 +962,14 @@ function renderStructure(structure) {
       section.className = 'language-section';
       
       const title = document.createElement('h2');
-      title.textContent = item.name === 'english' ? '🇬🇧 English' : '🇪🇸 Spanish';
+      title.textContent = item.name === 'english' ? '🇬🇧 English' : '🇪🇸 Español';
       section.appendChild(title);
       
       if (item.children) {
+        const isSpanish = item.name === 'spanish';
         item.children.forEach(child => {
           if (child.type === 'folder') {
-            section.appendChild(createFolderElement(child));
+            section.appendChild(createFolderElement(child, 0, isSpanish));
           }
         });
       }

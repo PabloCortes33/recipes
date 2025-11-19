@@ -91,63 +91,63 @@ const deleteJob = async (jobId) => {
 // Background job processor
 const processJob = async (jobId, jobData) => {
   try {
-    const { prompt } = jobData;
+    const { prompt, mode = 'create' } = jobData;
     
-    // Always generate research query from the prompt
-    // Extract key terms from the prompt for research
-    const researchQuery = prompt; // Use the full prompt as research query
-    
-    // Update status: Researching
-    jobData.status = 'researching';
-    jobData.progress = 'Researching with Gemini...';
-    await writeJob(jobId, jobData, 'pending');
-
-    // Always do research
     let researchContext = '';
-    try {
-      const escapedQuery = researchQuery.replace(/'/g, "'\\''");
-      const researchPrompt = `Research the following recipe topic and provide detailed information that will help create the best recipe:\n\n${escapedQuery}\n\nProvide specific details about:\n- Traditional ingredients and techniques\n- Cultural context and variations\n- Cooking methods and tips\n- Ingredient substitutions and alternatives\n- Serving suggestions and pairings`;
-      const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
+    let response = ''; // Will hold the Claude CLI response
+    
+    // Mode: "create" - do research first, then generate
+    if (mode === 'create') {
+      // Generate research query from the prompt
+      const researchQuery = prompt;
       
-      // Prepare environment for Claude Code CLI
-      // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
-      const claudeEnv = {
-        ...process.env,
-        HOME: process.env.HOME || '/home/pablo',
-        USER: process.env.USER || 'pablo',
-        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-      };
-      // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
-      delete claudeEnv.ANTHROPIC_API_KEY;
-      
-      const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
-        timeout: 600000, // 10 minute timeout
-        cwd: REPO_PATH, // Ensure we're in the repo directory
-        env: claudeEnv
-      });
-      if (stderr) console.error('Research stderr:', stderr);
-      researchContext = stdout.trim();
-      console.log(`[Job ${jobId}] Research completed`);
-      
-      jobData.researchContext = researchContext;
+      // Update status: Researching
+      jobData.status = 'researching';
+      jobData.progress = 'Researching with Gemini...';
       await writeJob(jobId, jobData, 'pending');
-    } catch (error) {
-      console.error(`[Job ${jobId}] Research failed:`, error.message);
-      // Continue without research if it fails
-      researchContext = '';
-    }
 
-    // Update status: Generating
-    jobData.status = 'generating';
-    jobData.progress = 'Generating recipe with Claude CLI...';
-    await writeJob(jobId, jobData, 'pending');
+      // Do research
+      try {
+        const escapedQuery = researchQuery.replace(/'/g, "'\\''");
+        const researchPrompt = `Research the following recipe topic and provide detailed information that will help create the best recipe:\n\n${escapedQuery}\n\nProvide specific details about:\n- Traditional ingredients and techniques\n- Cultural context and variations\n- Cooking methods and tips\n- Ingredient substitutions and alternatives\n- Serving suggestions and pairings`;
+        const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
+        
+        // Prepare environment for Claude Code CLI
+        const claudeEnv = {
+          ...process.env,
+          HOME: process.env.HOME || '/home/pablo',
+          USER: process.env.USER || 'pablo',
+          PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        };
+        delete claudeEnv.ANTHROPIC_API_KEY;
+        
+        const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+          timeout: 600000,
+          cwd: REPO_PATH,
+          env: claudeEnv
+        });
+        if (stderr) console.error('Research stderr:', stderr);
+        researchContext = stdout.trim();
+        console.log(`[Job ${jobId}] Research completed`);
+        
+        jobData.researchContext = researchContext;
+        await writeJob(jobId, jobData, 'pending');
+      } catch (error) {
+        console.error(`[Job ${jobId}] Research failed:`, error.message);
+        researchContext = '';
+      }
 
-    // Build recipe prompt
-    const fullPrompt = researchContext 
-      ? `Based on this research:\n\n${researchContext}\n\n---\n\nNow, ${prompt}`
-      : prompt;
+      // Update status: Generating
+      jobData.status = 'generating';
+      jobData.progress = 'Generating recipe with Claude CLI...';
+      await writeJob(jobId, jobData, 'pending');
 
-    const recipePrompt = `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe in markdown format.
+      // Build recipe prompt with research context
+      const fullPrompt = researchContext 
+        ? `Based on this research:\n\n${researchContext}\n\n---\n\nNow, ${prompt}`
+        : prompt;
+
+      const recipePrompt = `${fullPrompt}\n\nIMPORTANT: Generate TWO versions of the recipe in markdown format.
 
 For each version:
 - Use proper markdown format
@@ -169,30 +169,79 @@ Spanish: [suggested_filename].md
 
 Do not add any other text before or after this format. Just output the recipes in this exact structure.`;
 
-    // Generate recipe
-    const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
-    
-    // Prepare environment for Claude Code CLI
-    // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
-    const claudeEnv = {
-      ...process.env,
-      HOME: process.env.HOME || '/home/pablo',
-      USER: process.env.USER || 'pablo',
-      PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-    };
-    // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
-    delete claudeEnv.ANTHROPIC_API_KEY;
-    
-    const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
-      timeout: 600000, // 10 minute timeout (Claude can be slow)
-      cwd: REPO_PATH, // Ensure we're in the repo directory
-      env: claudeEnv
-    });
-    if (stderr) console.error('Claude stderr:', stderr);
-    const response = stdout.trim();
-    console.log(`[Job ${jobId}] Recipe generated`);
+      // Generate recipe
+      const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
+      
+      // Prepare environment for Claude Code CLI
+      const claudeEnv = {
+        ...process.env,
+        HOME: process.env.HOME || '/home/pablo',
+        USER: process.env.USER || 'pablo',
+        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      };
+      delete claudeEnv.ANTHROPIC_API_KEY;
+      
+      const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
+        timeout: 600000,
+        cwd: REPO_PATH,
+        env: claudeEnv
+      });
+      if (stderr) console.error('Claude stderr:', stderr);
+      response = stdout.trim();
+      console.log(`[Job ${jobId}] Recipe generated`);
+      
+    } else {
+      // Mode: "store" - format/organize existing recipe (no research)
+      jobData.status = 'formatting';
+      jobData.progress = 'Formatting recipe with Claude CLI...';
+      await writeJob(jobId, jobData, 'pending');
 
-    // Parse response
+      // Format the recipe prompt
+      const formatPrompt = `I have a recipe that I want to organize and format. Please take the following recipe content and format it properly according to my recipe collection structure:\n\n${prompt}\n\nIMPORTANT: Generate TWO versions of the recipe in markdown format (English and Spanish).
+
+For each version:
+- Use proper markdown format
+- Include: title, description, yields, prep/cook time
+- Organize: Ingredients section with proper grouping
+- Organize: Instructions section with clear steps
+- Use the same structure as existing recipes in the collection
+- Keep the recipe name consistent between versions (translated)
+- Extract and organize all information from the provided recipe
+
+You MUST provide your response EXACTLY in this format (output the content, do not try to save files):
+
+===ENGLISH===
+[full English recipe markdown content here]
+===SPANISH===
+[full Spanish recipe markdown content here]
+===FILENAMES===
+English: [suggested_filename].md
+Spanish: [suggested_filename].md
+
+Do not add any other text before or after this format. Just output the recipes in this exact structure.`;
+
+      const escapedFormatPrompt = formatPrompt.replace(/'/g, "'\\''");
+      
+      // Prepare environment for Claude Code CLI
+      const claudeEnv = {
+        ...process.env,
+        HOME: process.env.HOME || '/home/pablo',
+        USER: process.env.USER || 'pablo',
+        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      };
+      delete claudeEnv.ANTHROPIC_API_KEY;
+      
+      const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedFormatPrompt}'`, {
+        timeout: 600000,
+        cwd: REPO_PATH,
+        env: claudeEnv
+      });
+      if (stderr) console.error('Claude stderr:', stderr);
+      response = stdout.trim();
+      console.log(`[Job ${jobId}] Recipe formatted`);
+    }
+    
+    // Parse response (same for both modes)
     const englishMatch = response.match(/===ENGLISH===\n([\s\S]*?)===SPANISH===/);
     const spanishMatch = response.match(/===SPANISH===\n([\s\S]*?)===FILENAMES===/);
     const filenamesMatch = response.match(/===FILENAMES===\n([\s\S]*?)$/);
@@ -219,7 +268,7 @@ Do not add any other text before or after this format. Just output the recipes i
     const completedData = {
       ...jobData,
       status: 'completed',
-      progress: 'Recipe generated successfully',
+      progress: mode === 'create' ? 'Recipe generated successfully' : 'Recipe formatted successfully',
       completedAt: new Date().toISOString(),
       recipes: {
         english: {
@@ -279,17 +328,18 @@ app.get('/api/health', (req, res) => {
 // Start recipe generation (returns jobId immediately)
 app.post('/api/generate-recipe', async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, mode = 'create' } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // Create job (research will be automatically generated from prompt)
+    // Create job
     const jobId = Date.now().toString();
     const jobData = {
       jobId,
       prompt,
+      mode: mode === 'store' ? 'store' : 'create',
       status: 'pending',
       progress: 'Starting...',
       createdAt: new Date().toISOString()
