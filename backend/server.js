@@ -91,49 +91,50 @@ const deleteJob = async (jobId) => {
 // Background job processor
 const processJob = async (jobId, jobData) => {
   try {
-    const { prompt, researchQuery } = jobData;
+    const { prompt } = jobData;
+    
+    // Always generate research query from the prompt
+    // Extract key terms from the prompt for research
+    const researchQuery = prompt; // Use the full prompt as research query
     
     // Update status: Researching
-    if (researchQuery) {
-      jobData.status = 'researching';
-      jobData.progress = 'Researching with Gemini...';
-      await writeJob(jobId, jobData, 'pending');
-    }
+    jobData.status = 'researching';
+    jobData.progress = 'Researching with Gemini...';
+    await writeJob(jobId, jobData, 'pending');
 
-    // Do research if requested
+    // Always do research
     let researchContext = '';
-    if (researchQuery) {
-      try {
-        const escapedQuery = researchQuery.replace(/'/g, "'\\''");
-        const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
-        const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
-        
-        // Prepare environment for Claude Code CLI
-        // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
-        const claudeEnv = {
-          ...process.env,
-          HOME: process.env.HOME || '/home/pablo',
-          USER: process.env.USER || 'pablo',
-          PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-        };
-        // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
-        delete claudeEnv.ANTHROPIC_API_KEY;
-        
-        const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
-          timeout: 600000, // 10 minute timeout
-          cwd: REPO_PATH, // Ensure we're in the repo directory
-          env: claudeEnv
-        });
-        if (stderr) console.error('Research stderr:', stderr);
-        researchContext = stdout.trim();
-        console.log(`[Job ${jobId}] Research completed`);
-        
-        jobData.researchContext = researchContext;
-        await writeJob(jobId, jobData, 'pending');
-      } catch (error) {
-        console.error(`[Job ${jobId}] Research failed:`, error.message);
-        // Continue without research
-      }
+    try {
+      const escapedQuery = researchQuery.replace(/'/g, "'\\''");
+      const researchPrompt = `Research the following recipe topic and provide detailed information that will help create the best recipe:\n\n${escapedQuery}\n\nProvide specific details about:\n- Traditional ingredients and techniques\n- Cultural context and variations\n- Cooking methods and tips\n- Ingredient substitutions and alternatives\n- Serving suggestions and pairings`;
+      const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
+      
+      // Prepare environment for Claude Code CLI
+      // IMPORTANT: Remove ANTHROPIC_API_KEY - Claude Code uses its own auth mechanism
+      const claudeEnv = {
+        ...process.env,
+        HOME: process.env.HOME || '/home/pablo',
+        USER: process.env.USER || 'pablo',
+        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      };
+      // Remove ANTHROPIC_API_KEY - Claude Code CLI uses ~/.claude/.credentials.json instead
+      delete claudeEnv.ANTHROPIC_API_KEY;
+      
+      const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+        timeout: 600000, // 10 minute timeout
+        cwd: REPO_PATH, // Ensure we're in the repo directory
+        env: claudeEnv
+      });
+      if (stderr) console.error('Research stderr:', stderr);
+      researchContext = stdout.trim();
+      console.log(`[Job ${jobId}] Research completed`);
+      
+      jobData.researchContext = researchContext;
+      await writeJob(jobId, jobData, 'pending');
+    } catch (error) {
+      console.error(`[Job ${jobId}] Research failed:`, error.message);
+      // Continue without research if it fails
+      researchContext = '';
     }
 
     // Update status: Generating
@@ -278,18 +279,17 @@ app.get('/api/health', (req, res) => {
 // Start recipe generation (returns jobId immediately)
 app.post('/api/generate-recipe', async (req, res) => {
   try {
-    const { prompt, researchQuery } = req.body;
+    const { prompt } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // Create job
+    // Create job (research will be automatically generated from prompt)
     const jobId = Date.now().toString();
     const jobData = {
       jobId,
       prompt,
-      researchQuery: researchQuery || null,
       status: 'pending',
       progress: 'Starting...',
       createdAt: new Date().toISOString()

@@ -200,14 +200,9 @@
             
             <!-- Recipe Generation Form -->
             <div class="form-group">
-                <label for="research-query">Research Query (optional):</label>
-                <input type="text" id="research-query" placeholder="e.g., 'Italian carbonara sauce techniques'">
-                <small style="color: #666;">🔷 Uses Gemini (via Claude CLI agent) for research, then 🤖 Claude CLI for recipe generation</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="recipe-prompt">Recipe Generation Prompt:</label>
-                <textarea id="recipe-prompt" placeholder="Example: Create a recipe for Turkish Çılbır with a modern twist using sriracha instead of Aleppo pepper. Include poaching techniques and tips for perfect eggs."></textarea>
+                <label for="recipe-prompt">What recipe would you like to create?</label>
+                <textarea id="recipe-prompt" placeholder="Example: roasted capsicum dip with peanuts"></textarea>
+                <small style="color: #666;">🔷 Automatically researches with Gemini, then 🤖 generates recipe with Claude CLI</small>
             </div>
             
             <button class="btn btn-primary" onclick="generateRecipe()" id="generate-btn">
@@ -258,11 +253,10 @@
         let pollInterval = null;
         
         async function generateRecipe() {
-            const researchQuery = document.getElementById('research-query').value;
-            const prompt = document.getElementById('recipe-prompt').value;
+            const prompt = document.getElementById('recipe-prompt').value.trim();
             
             if (!prompt) {
-                showStatus('generation-status', 'Please enter a recipe prompt', 'error');
+                showStatus('generation-status', 'Please enter what recipe you want to create', 'error');
                 return;
             }
             
@@ -273,13 +267,13 @@
             document.getElementById('recipe-preview').classList.remove('hidden');
             
             try {
-                // Start job
+                // Start job (backend will automatically generate research query from prompt)
                 const response = await fetch('/api/generate-recipe', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ prompt, researchQuery })
+                    body: JSON.stringify({ prompt })
                 });
                 
                 const data = await response.json();
@@ -332,9 +326,7 @@
                         currentRecipes = job.recipes;
                         displayRecipePreview(job.recipes, job.researchContext);
                         
-                        const successMsg = job.researchContext 
-                            ? 'Recipe generated successfully (Gemini research + Claude CLI)!'
-                            : 'Recipe generated successfully (Claude CLI)!';
+                        const successMsg = 'Recipe generated successfully! 🔷 Gemini research → 🤖 Claude CLI generation';
                         showStatus('generation-status', successMsg + ' <a href="/jobs.html" style="margin-left: 1em;">View in Jobs Dashboard</a>', 'success');
                         document.getElementById('git-controls').classList.remove('hidden');
                         document.getElementById('generate-btn').disabled = false;
@@ -372,12 +364,9 @@
         
         function displayRecipePreview(recipes, usedResearch) {
             const preview = document.getElementById('recipe-preview');
-            const subtitle = usedResearch 
-                ? '🔷 Gemini Research → 🤖 Claude CLI Generation'
-                : '🤖 Claude CLI Generation';
             preview.innerHTML = `
                 <h3>Generated Recipes</h3>
-                <p style="color: #666; font-size: 0.9em; margin-top: -0.5em;">${subtitle}</p>
+                <p style="color: #666; font-size: 0.9em; margin-top: -0.5em;">🔷 Gemini Research → 🤖 Claude CLI Generation</p>
                 <div style="margin-bottom: 2em;">
                     <h4>🇬🇧 English: ${recipes.english.filename}</h4>
                     <pre>${recipes.english.content}</pre>
