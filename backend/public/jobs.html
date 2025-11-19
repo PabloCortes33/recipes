@@ -273,6 +273,8 @@
     
     <script>
         let autoRefreshInterval = null;
+        let expandedErrors = new Set(); // Track which error details are open
+        let expandedRecipes = new Set(); // Track which recipes are open
         
         function formatTimeAgo(timestamp) {
             const now = new Date();
@@ -411,17 +413,35 @@
                     document.getElementById('loading').style.display = 'block';
                 }
                 
+                // Restore expanded states after refresh
+                expandedErrors.forEach(jobId => {
+                    const errorDiv = document.getElementById(`error-details-${jobId}`);
+                    if (errorDiv) {
+                        // Re-fetch and display the error details
+                        viewErrorDetails(jobId, true);
+                    }
+                });
+                
+                expandedRecipes.forEach(jobId => {
+                    const recipeDiv = document.getElementById(`recipe-preview-${jobId}`);
+                    if (recipeDiv) {
+                        // Re-fetch and display the recipe
+                        viewRecipe(jobId, true);
+                    }
+                });
+                
             } catch (error) {
                 console.error('Error loading jobs:', error);
                 document.getElementById('loading').innerHTML = '<p style="color: red;">Error loading jobs. Please refresh.</p>';
             }
         }
         
-        async function viewRecipe(jobId) {
+        async function viewRecipe(jobId, skipToggle = false) {
             const previewDiv = document.getElementById(`recipe-preview-${jobId}`);
             
-            if (previewDiv.style.display === 'block') {
+            if (!skipToggle && previewDiv.style.display === 'block') {
                 previewDiv.style.display = 'none';
+                expandedRecipes.delete(jobId);
                 return;
             }
             
@@ -439,16 +459,18 @@
                     </div>
                 `;
                 previewDiv.style.display = 'block';
+                expandedRecipes.add(jobId);
             } catch (error) {
                 alert('Error loading recipe: ' + error.message);
             }
         }
         
-        async function viewErrorDetails(jobId) {
+        async function viewErrorDetails(jobId, skipToggle = false) {
             const errorDiv = document.getElementById(`error-details-${jobId}`);
             
-            if (errorDiv.style.display === 'block') {
+            if (!skipToggle && errorDiv.style.display === 'block') {
                 errorDiv.style.display = 'none';
+                expandedErrors.delete(jobId);
                 return;
             }
             
@@ -485,6 +507,7 @@
                 
                 errorDiv.innerHTML = errorHtml;
                 errorDiv.style.display = 'block';
+                expandedErrors.add(jobId);
             } catch (error) {
                 alert('Error loading details: ' + error.message);
             }
