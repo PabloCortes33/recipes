@@ -19,6 +19,7 @@ const FRONTEND_PATH = path.join(REPO_PATH, 'frontend');
 const JOBS_PATH = path.join(REPO_PATH, 'backend', '.jobs');
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO || 'origin';
+const CLAUDE_PATH = process.env.CLAUDE_PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin/claude';
 
 // Initialize git
 const git = simpleGit(REPO_PATH);
@@ -107,7 +108,7 @@ const processJob = async (jobId, jobData) => {
         const researchPrompt = `Research the following topic and provide detailed information that will help create a recipe:\n\n${escapedQuery}\n\nProvide specific details about ingredients, techniques, cultural context, and any important variations.`;
         const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
         
-        const { stdout, stderr } = await execPromise(`unbuffer claude --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+        const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
           timeout: 600000 // 10 minute timeout
         });
         if (stderr) console.error('Research stderr:', stderr);
@@ -157,7 +158,7 @@ Do not add any other text before or after this format. Just output the recipes i
     // Generate recipe
     const escapedRecipePrompt = recipePrompt.replace(/'/g, "'\\''");
     
-    const { stdout, stderr } = await execPromise(`unbuffer claude --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
+    const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '${escapedRecipePrompt}'`, {
       timeout: 600000 // 10 minute timeout (Claude can be slow)
     });
     if (stderr) console.error('Claude stderr:', stderr);
@@ -643,5 +644,6 @@ app.listen(PORT, () => {
   console.log(`📝 Repository path: ${REPO_PATH}`);
   console.log(`📚 Recipes path: ${RECIPES_PATH}`);
   console.log(`💼 Jobs path: ${JOBS_PATH}`);
+  console.log(`🤖 Claude CLI path: ${CLAUDE_PATH}`);
   console.log(`🐙 GitHub Token: ${GITHUB_TOKEN ? 'Configured' : 'Not configured'}`);
 });

@@ -21,3 +21,8 @@ GITHUB_REPO=origin
 # Locally for testing: /Users/YOUR_USERNAME/Desktop/recipes
 REPO_PATH=/Users/YOUR_USERNAME/Desktop/recipes
 
+# Claude CLI Path (optional, auto-detected if in PATH)
+# Find yours with: which claude
+# Example: /home/pablo/.nvm/versions/node/v20.19.5/bin/claude
+CLAUDE_PATH=/home/pablo/.nvm/versions/node/v20.19.5/bin/claude
+
