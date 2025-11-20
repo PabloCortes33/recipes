@@ -1,0 +1,78 @@
+.job-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5em;
+  margin-bottom: 1em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.job-id {
+  font-weight: 600;
+  color: #333;
+}
+
+.job-status {
+  padding: 0.25em 0.75em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.status-in-progress {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-failed {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.job-content {
+  margin-bottom: 1em;
+}
+
+.job-prompt {
+  font-weight: 500;
+  margin-bottom: 0.5em;
+  color: #333;
+}
+
+.job-research {
+  color: #666;
+  font-size: 0.9em;
+  margin-bottom: 0.5em;
+}
+
+.job-time {
+  color: #666;
+  font-size: 0.85em;
+}
+
+.job-error {
+  color: #dc3545;
+  margin-top: 0.5em;
+  font-size: 0.9em;
+}
+
+.job-actions {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: wrap;
+}
+

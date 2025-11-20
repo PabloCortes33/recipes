@@ -40,7 +40,19 @@ const runningJobs = new Map();
 // Middleware
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// CORS for React frontend
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// API routes only - no static file serving
 
 // Helper: Read job from disk
 const readJob = async (jobId) => {
@@ -323,6 +335,44 @@ Do not add any other text before or after this format. Just output the recipes i
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Get recipe manifest/structure
+app.get('/api/recipes/manifest', async (req, res) => {
+  try {
+    const manifestPath = path.join(FRONTEND_PATH, 'manifest.json');
+    const manifestData = await fs.readFile(manifestPath, 'utf8');
+    res.json(JSON.parse(manifestData));
+  } catch (error) {
+    console.error('Error loading manifest:', error);
+    res.status(500).json({ error: 'Failed to load recipe manifest' });
+  }
+});
+
+// Get individual recipe file
+app.get('/api/recipes/file/:path(*)', async (req, res) => {
+  try {
+    const recipePath = path.join(REPO_PATH, req.params.path);
+    
+    // Security: ensure path is within recipes directory
+    const normalizedPath = path.normalize(recipePath);
+    const recipesDir = path.normalize(RECIPES_PATH);
+    
+    if (!normalizedPath.startsWith(recipesDir)) {
+      return res.status(403).json({ error: 'Invalid path' });
+    }
+    
+    const content = await fs.readFile(recipePath, 'utf8');
+    res.setHeader('Content-Type', 'text/markdown');
+    res.send(content);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.status(404).json({ error: 'Recipe not found' });
+    } else {
+      console.error('Error loading recipe:', error);
+      res.status(500).json({ error: 'Failed to load recipe' });
+    }
+  }
 });
 
 // Start recipe generation (returns jobId immediately)

@@ -1,0 +1,31 @@
+.recipe-file {
+  margin: 0.3em 0;
+}
+
+.file-link {
+  text-decoration: none;
+  color: #007BFF;
+  padding: 0.5em;
+  display: block;
+  border-radius: 4px;
+  transition: background 0.2s;
+  cursor: pointer;
+  font-size: 0.9em;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .file-link {
+    padding: 0.3em 0.5em;
+    font-size: 1em;
+    min-height: auto;
+  }
+}
+
+.file-link:hover,
+.file-link:active {
+  background: #e3f2fd;
+}
+

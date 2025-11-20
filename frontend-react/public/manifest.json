@@ -1,0 +1,17 @@
+{
+  "name": "Recipes Collection",
+  "short_name": "Recipes",
+  "description": "Personal recipes collection organized by language and category",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007BFF",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+

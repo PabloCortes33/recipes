@@ -1,0 +1,59 @@
+.serving-adjuster {
+  background: #f8f9fa;
+  border: 2px solid #007BFF;
+  border-radius: 8px;
+  padding: 1em;
+  margin: 1em 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+
+.serving-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1em;
+}
+
+.serving-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+}
+
+.serving-btn {
+  background: #007BFF;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.3em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-family: inherit;
+}
+
+.serving-btn:hover,
+.serving-btn:active {
+  background: #0056b3;
+}
+
+.serving-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.serving-value {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #007BFF;
+  min-width: 120px;
+  text-align: center;
+}
+

@@ -1,0 +1,130 @@
+.recipe-browser {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1em;
+}
+
+@media (min-width: 768px) {
+  .recipe-browser {
+    padding: 2em;
+  }
+}
+
+.browser-header {
+  margin-bottom: 1.5em;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+
+@media (min-width: 768px) {
+  .browser-header {
+    margin-bottom: 2em;
+  }
+}
+
+.browser-header-actions {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.browser-header h1 {
+  color: #333;
+  margin: 0 0 0.5em 0;
+  font-size: 1.8em;
+}
+
+@media (min-width: 768px) {
+  .browser-header h1 {
+    font-size: 2.5em;
+  }
+}
+
+.browser-subtitle {
+  color: #666;
+  font-size: 0.85em;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+
+@media (min-width: 768px) {
+  .browser-subtitle {
+    font-size: 0.9em;
+  }
+}
+
+.ideas-tab-btn {
+  background: #f8f9fa;
+  color: #007BFF;
+  border: 2px solid #007BFF;
+  padding: 0.5em 1em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: inherit;
+}
+
+.ideas-tab-btn:hover,
+.ideas-tab-btn:active {
+  background: #007BFF;
+  color: white;
+}
+
+.browser-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5em;
+}
+
+@media (min-width: 768px) {
+  .browser-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2em;
+  }
+}
+
+.language-section {
+  background: white;
+  padding: 1em;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .language-section {
+    padding: 1.5em;
+  }
+}
+
+.language-section h2 {
+  color: #333;
+  margin: 0 0 0.8em 0;
+  padding-bottom: 0.5em;
+  border-bottom: 2px solid #007BFF;
+  font-size: 1.3em;
+}
+
+@media (min-width: 768px) {
+  .language-section h2 {
+    font-size: 1.5em;
+    margin-bottom: 1em;
+  }
+}
+
+.browser-timestamp {
+  text-align: center;
+  color: #999;
+  font-size: 0.8em;
+  margin-top: 2em;
+}
+

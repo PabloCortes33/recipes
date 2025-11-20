@@ -1,0 +1,19 @@
+.mode-toggle {
+  display: flex;
+  gap: 1em;
+  align-items: center;
+  margin-bottom: 1.5em;
+}
+
+.mode-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.mode-label input[type="radio"] {
+  margin-right: 0.5em;
+  width: auto;
+}
+
