@@ -9,6 +9,13 @@ const { promisify } = require('util');
 const execPromise = promisify(exec);
 require('dotenv').config();
 
+// Import middleware
+const { authenticate } = require('./middleware/auth');
+const { rateLimiters } = require('./middleware/rateLimiter');
+const { helmet } = require('./middleware/security');
+const { validateRecipeGeneration, validateCommit, validateRecipePath } = require('./middleware/validation');
+const { asyncHandler, errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -41,6 +48,9 @@ const runningJobs = new Map();
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
+// Security headers (must be before CORS)
+app.use(helmet);
+
 // CORS for React frontend
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -51,6 +61,10 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Rate limiting for public endpoints
+app.use('/api/recipes/manifest', rateLimiters.public);
+app.use('/api/recipes/file', rateLimiters.public);
 
 // API routes only - no static file serving
 
@@ -338,254 +352,270 @@ app.get('/api/health', (req, res) => {
 });
 
 // Get recipe manifest/structure
-app.get('/api/recipes/manifest', async (req, res) => {
-  try {
-    const manifestPath = path.join(FRONTEND_PATH, 'manifest.json');
-    const manifestData = await fs.readFile(manifestPath, 'utf8');
-    res.json(JSON.parse(manifestData));
-  } catch (error) {
-    console.error('Error loading manifest:', error);
-    res.status(500).json({ error: 'Failed to load recipe manifest' });
-  }
-});
-
-// Get individual recipe file
-app.get('/api/recipes/file/:path(*)', async (req, res) => {
-  try {
-    const recipePath = path.join(REPO_PATH, req.params.path);
-    
-    // Security: ensure path is within recipes directory
-    const normalizedPath = path.normalize(recipePath);
-    const recipesDir = path.normalize(RECIPES_PATH);
-    
-    if (!normalizedPath.startsWith(recipesDir)) {
-      return res.status(403).json({ error: 'Invalid path' });
-    }
-    
-    const content = await fs.readFile(recipePath, 'utf8');
-    res.setHeader('Content-Type', 'text/markdown');
-    res.send(content);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      res.status(404).json({ error: 'Recipe not found' });
-    } else {
-      console.error('Error loading recipe:', error);
-      res.status(500).json({ error: 'Failed to load recipe' });
-    }
-  }
-});
-
-// Start recipe generation (returns jobId immediately)
-app.post('/api/generate-recipe', async (req, res) => {
-  try {
-    const { prompt, mode = 'create' } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
-
-    // Create job
-    const jobId = Date.now().toString();
-    const jobData = {
-      jobId,
-      prompt,
-      mode: mode === 'store' ? 'store' : 'create',
-      status: 'pending',
-      progress: 'Starting...',
-      createdAt: new Date().toISOString()
-    };
-
-    await writeJob(jobId, jobData, 'pending');
-
-    // Start processing in background (don't await)
-    processJob(jobId, jobData).catch(err => {
-      console.error(`Background job ${jobId} error:`, err);
-    });
-
-    // Return immediately
-    res.json({ 
-      success: true,
-      jobId 
-    });
-
-  } catch (error) {
-    console.error('Error starting job:', error);
-    res.status(500).json({ 
-      error: 'Failed to start job', 
-      details: error.message 
-    });
-  }
-});
-
-// Get job status
-app.get('/api/job/:jobId', async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const job = await readJob(jobId);
-    
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-
-    res.json(job);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// List all jobs
-app.get('/api/jobs', async (req, res) => {
-  try {
-    const readJobsFromFolder = async (folder) => {
-      try {
-        const files = await fs.readdir(path.join(JOBS_PATH, folder));
-        const jobs = await Promise.all(
-          files
-            .filter(f => f.endsWith('.json'))
-            .map(async (file) => {
-              const data = await fs.readFile(path.join(JOBS_PATH, folder, file), 'utf8');
-              return JSON.parse(data);
-            })
-        );
-        return jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      } catch (error) {
-        return [];
-      }
-    };
-
-    const [pending, completed, failed] = await Promise.all([
-      readJobsFromFolder('pending'),
-      readJobsFromFolder('completed'),
-      readJobsFromFolder('failed')
-    ]);
-
-    res.json({
-      pending,
-      drafts: completed, // completed = drafts (not yet committed)
-      failed
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Commit a draft (save to recipes folder and commit to git)
-app.post('/api/job/:jobId/commit', async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    const { commitMessage } = req.body;
-    
-    console.log(`[Commit] Starting commit for job ${jobId}`);
-    
-    const job = await readJob(jobId);
-    
-    if (!job) {
-      console.error(`[Commit] Job ${jobId} not found`);
-      return res.status(404).json({ error: 'Job not found' });
-    }
-    
-    if (job.folder !== 'completed') {
-      console.error(`[Commit] Job ${jobId} is not completed (folder: ${job.folder})`);
-      return res.status(400).json({ error: `Job is not completed. Current status: ${job.folder}` });
-    }
-
-    if (!job.recipes || !job.recipes.english || !job.recipes.spanish) {
-      console.error(`[Commit] Job ${jobId} missing recipes data`);
-      return res.status(400).json({ error: 'Job missing recipe data' });
-    }
-
-    const { recipes } = job;
-    console.log(`[Commit] Recipes found: ${recipes.english.filename}, ${recipes.spanish.filename}`);
-
-    // Save English recipe
-    const englishPath = path.join(REPO_PATH, recipes.english.path);
-    await fs.mkdir(path.dirname(englishPath), { recursive: true });
-    await fs.writeFile(englishPath, recipes.english.content, 'utf8');
-
-    // Save Spanish recipe
-    const spanishPath = path.join(REPO_PATH, recipes.spanish.path);
-    await fs.mkdir(path.dirname(spanishPath), { recursive: true });
-    await fs.writeFile(spanishPath, recipes.spanish.content, 'utf8');
-
-    // Regenerate manifest
+app.get('/api/recipes/manifest', asyncHandler(async (req, res) => {
+  // Generate recipe structure manifest dynamically
+  const scanDirectory = (dirPath, basePath = '') => {
+    const items = [];
     try {
-      await new Promise((resolve, reject) => {
-        exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error, stdout, stderr) => {
-          if (error) {
-            console.error('Manifest generation error:', error);
-            console.error('Manifest stderr:', stderr);
-            reject(error);
-          } else {
-            console.log('Manifest generated successfully');
-            resolve();
-          }
-        });
-      });
-    } catch (error) {
-      console.error('Failed to regenerate manifest:', error);
-      // Continue anyway - recipes are saved
-    }
-
-    // Git operations
-    try {
-      await git.add([
-        recipes.english.path,
-        recipes.spanish.path,
-        'frontend/index.html',
-        'frontend/service-worker.js'
-      ]);
-
-      const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
-      await git.commit(message);
-      console.log(`Committed: ${message}`);
-
-      // Push to GitHub
-      try {
-        console.log(`[Commit] Attempting to push to ${GITHUB_REPO}/main`);
-        
-        // Configure git remote URL with token if available
-        if (GITHUB_TOKEN) {
-          const remoteUrl = `https://${GITHUB_TOKEN}@github.com/PabloCortes33/recipes.git`;
-          await git.remote(['set-url', 'origin', remoteUrl]);
-          console.log('[Commit] Configured git remote with token');
+      const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        // Skip hidden files and system folders
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+          continue;
         }
         
-        await git.push(GITHUB_REPO, 'main');
-        console.log('[Commit] Pushed to GitHub successfully');
-      } catch (pushError) {
-        console.error('[Commit] Git push failed:', pushError);
-        console.error('[Commit] Push error details:', pushError.message);
-        // Don't fail the whole operation if push fails - recipe is still committed
-        // Move job to committed anyway
-        await moveJob(jobId, 'completed', 'committed');
-        return res.json({
-          success: true,
-          message: 'Recipe committed locally. Push to GitHub failed - you can push manually.',
-          warning: pushError.message,
-          error: pushError.message
-        });
+        const fullPath = path.join(dirPath, entry.name);
+        const relativePath = path.join(basePath, entry.name);
+        
+        if (entry.isDirectory()) {
+          const children = scanDirectory(fullPath, relativePath);
+          items.push({
+            name: entry.name,
+            type: 'folder',
+            path: relativePath,
+            children: children
+          });
+        } else if (entry.name.endsWith('.md')) {
+          items.push({
+            name: entry.name.replace('.md', ''),
+            type: 'file',
+            path: relativePath
+          });
+        }
       }
-
-      // Move job to committed
-      await moveJob(jobId, 'completed', 'committed');
-
-      res.json({
-        success: true,
-        message: 'Recipe committed and pushed to GitHub'
-      });
-    } catch (gitError) {
-      console.error('Git operation failed:', gitError);
-      throw gitError;
+    } catch (error) {
+      console.error(`Error scanning directory ${dirPath}:`, error);
     }
+    
+    return items.sort((a, b) => {
+      // Folders first, then alphabetically
+      if (a.type === 'folder' && b.type !== 'folder') return -1;
+      if (a.type !== 'folder' && b.type === 'folder') return 1;
+      return a.name.localeCompare(b.name);
+    });
+  };
+  
+  const structure = scanDirectory(RECIPES_PATH, 'recipes');
+  const manifest = {
+    generated: new Date().toISOString(),
+    structure: structure
+  };
+  
+  res.json(manifest);
+}));
 
+// Get individual recipe file
+app.get('/api/recipes/file/:path(*)', validateRecipePath, asyncHandler(async (req, res) => {
+  // Ensure path starts with 'recipes/' prefix
+  let recipePath = req.params.path;
+  if (!recipePath.startsWith('recipes/')) {
+    recipePath = 'recipes/' + recipePath;
+  }
+  
+  const fullPath = path.join(REPO_PATH, recipePath);
+  
+  // Security: ensure path is within recipes directory
+  const normalizedPath = path.normalize(fullPath);
+  const recipesDir = path.normalize(RECIPES_PATH);
+  
+  if (!normalizedPath.startsWith(recipesDir)) {
+    const err = new Error('Invalid path');
+    err.statusCode = 403;
+    throw err;
+  }
+  
+  const content = await fs.readFile(fullPath, 'utf8');
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.send(content);
+}));
+
+// Admin routes - require authentication and rate limiting
+app.use('/api/generate-recipe', authenticate, rateLimiters.recipeGeneration);
+app.use('/api/job', authenticate, rateLimiters.admin);
+app.use('/api/jobs', authenticate, rateLimiters.admin);
+app.use('/api/git', authenticate, rateLimiters.admin);
+app.use('/api/save-recipe', authenticate, rateLimiters.admin);
+
+// Start recipe generation (returns jobId immediately)
+app.post('/api/generate-recipe', validateRecipeGeneration, asyncHandler(async (req, res) => {
+  const { prompt, mode = 'create' } = req.body;
+
+  // Create job
+  const jobId = Date.now().toString();
+  const jobData = {
+    jobId,
+    prompt,
+    mode: mode === 'store' ? 'store' : 'create',
+    status: 'pending',
+    progress: 'Starting...',
+    createdAt: new Date().toISOString()
+  };
+
+  await writeJob(jobId, jobData, 'pending');
+
+  // Start processing in background (don't await)
+  processJob(jobId, jobData).catch(err => {
+    console.error(`Background job ${jobId} error:`, err);
+  });
+
+  // Return immediately
+  res.json({ 
+    success: true,
+    jobId 
+  });
+}));
+
+// Get job status
+app.get('/api/job/:jobId', asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const job = await readJob(jobId);
+  
+  if (!job) {
+    const err = new Error('Job not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  res.json(job);
+}));
+
+// List all jobs
+app.get('/api/jobs', asyncHandler(async (req, res) => {
+  const readJobsFromFolder = async (folder) => {
+    try {
+      const files = await fs.readdir(path.join(JOBS_PATH, folder));
+      const jobs = await Promise.all(
+        files
+          .filter(f => f.endsWith('.json'))
+          .map(async (file) => {
+            const data = await fs.readFile(path.join(JOBS_PATH, folder, file), 'utf8');
+            return JSON.parse(data);
+          })
+      );
+      return jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const [pending, completed, failed] = await Promise.all([
+    readJobsFromFolder('pending'),
+    readJobsFromFolder('completed'),
+    readJobsFromFolder('failed')
+  ]);
+
+  res.json({
+    pending,
+    drafts: completed, // completed = drafts (not yet committed)
+    failed
+  });
+}));
+
+// Commit a draft (save to recipes folder and commit to git)
+app.post('/api/job/:jobId/commit', validateCommit, asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const { commitMessage } = req.body;
+    
+  console.log(`[Commit] Starting commit for job ${jobId}`);
+  
+  const job = await readJob(jobId);
+  
+  if (!job) {
+    const err = new Error('Job not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  
+  if (job.folder !== 'completed') {
+    const err = new Error(`Job is not completed. Current status: ${job.folder}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!job.recipes || !job.recipes.english || !job.recipes.spanish) {
+    const err = new Error('Job missing recipe data');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { recipes } = job;
+  console.log(`[Commit] Recipes found: ${recipes.english.filename}, ${recipes.spanish.filename}`);
+
+  // Save English recipe
+  const englishPath = path.join(REPO_PATH, recipes.english.path);
+  await fs.mkdir(path.dirname(englishPath), { recursive: true });
+  await fs.writeFile(englishPath, recipes.english.content, 'utf8');
+
+  // Save Spanish recipe
+  const spanishPath = path.join(REPO_PATH, recipes.spanish.path);
+  await fs.mkdir(path.dirname(spanishPath), { recursive: true });
+  await fs.writeFile(spanishPath, recipes.spanish.content, 'utf8');
+
+  // Regenerate manifest (non-blocking - continue if it fails)
+  try {
+    await new Promise((resolve, reject) => {
+      exec('node generate_manifest.js', { cwd: FRONTEND_PATH }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Manifest generation error:', error);
+          console.error('Manifest stderr:', stderr);
+          reject(error);
+        } else {
+          console.log('Manifest generated successfully');
+          resolve();
+        }
+      });
+    });
   } catch (error) {
-    console.error('Error committing job:', error);
-    res.status(500).json({ 
-      error: 'Failed to commit recipe', 
-      details: error.message 
+    console.error('Failed to regenerate manifest:', error);
+    // Continue anyway - recipes are saved
+  }
+
+  // Git operations
+  await git.add([
+    recipes.english.path,
+    recipes.spanish.path,
+    'frontend/index.html',
+    'frontend/service-worker.js'
+  ]);
+
+  const message = commitMessage || `Add recipe: ${recipes.english.filename}`;
+  await git.commit(message);
+  console.log(`Committed: ${message}`);
+
+  // Push to GitHub (non-blocking - return success even if push fails)
+  try {
+    console.log(`[Commit] Attempting to push to ${GITHUB_REPO}/main`);
+    
+    // Configure git remote URL with token if available
+    if (GITHUB_TOKEN) {
+      const remoteUrl = `https://${GITHUB_TOKEN}@github.com/PabloCortes33/recipes.git`;
+      await git.remote(['set-url', 'origin', remoteUrl]);
+      console.log('[Commit] Configured git remote with token');
+    }
+    
+    await git.push(GITHUB_REPO, 'main');
+    console.log('[Commit] Pushed to GitHub successfully');
+  } catch (pushError) {
+    console.error('[Commit] Git push failed:', pushError);
+    console.error('[Commit] Push error details:', pushError.message);
+    // Don't fail the whole operation if push fails - recipe is still committed
+    await moveJob(jobId, 'completed', 'committed');
+    return res.json({
+      success: true,
+      message: 'Recipe committed locally. Push to GitHub failed - you can push manually.',
+      warning: pushError.message
     });
   }
-});
+
+  // Move job to committed
+  await moveJob(jobId, 'completed', 'committed');
+
+  res.json({
+    success: true,
+    message: 'Recipe committed and pushed to GitHub'
+  });
+}));
 
 // Refine a completed recipe (brainstorm/iterate)
 app.post('/api/job/:jobId/refine', async (req, res) => {
@@ -1034,6 +1064,12 @@ app.get('/api/recipes', async (req, res) => {
   }
 });
 
+// 404 handler for undefined routes (must be after all routes)
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🍳 Recipe Server running on port ${PORT}`);
@@ -1042,4 +1078,5 @@ app.listen(PORT, () => {
   console.log(`💼 Jobs path: ${JOBS_PATH}`);
   console.log(`🤖 Claude CLI path: ${CLAUDE_PATH}`);
   console.log(`🐙 GitHub Token: ${GITHUB_TOKEN ? 'Configured' : 'Not configured'}`);
+  console.log(`🔒 Admin Password: ${process.env.ADMIN_PASSWORD || process.env.PASSWORD ? 'Configured' : '⚠️  NOT CONFIGURED - Admin routes unprotected!'}`);
 });

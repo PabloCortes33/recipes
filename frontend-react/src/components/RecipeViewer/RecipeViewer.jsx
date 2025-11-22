@@ -84,7 +84,7 @@ export const RecipeViewer = () => {
   if (error) {
     return (
       <div className="recipe-viewer">
-        <Button variant="primary" onClick={() => navigate('/browse')}>
+        <Button variant="primary" onClick={() => navigate('/')}>
           ← Back to Recipes
         </Button>
         <StatusMessage type="error" message={error} />
@@ -95,7 +95,7 @@ export const RecipeViewer = () => {
   return (
     <div className="recipe-viewer">
       <div className="viewer-actions">
-        <Button variant="primary" onClick={() => navigate('/browse')}>
+        <Button variant="primary" onClick={() => navigate('/')}>
           ← Back to Recipes
         </Button>
         <Button variant="success" onClick={handleRefactor}>

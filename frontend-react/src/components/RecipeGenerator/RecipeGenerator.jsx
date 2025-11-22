@@ -92,7 +92,7 @@ export const RecipeGenerator = () => {
       <div className="generator-header">
         <h1>🍳 AI Recipe Generator</h1>
         <div className="header-actions">
-          <Button variant="secondary" onClick={() => navigate('/browse')}>
+          <Button variant="secondary" onClick={() => navigate('/')}>
             📚 Browse Recipes
           </Button>
           <Button variant="secondary" onClick={() => navigate('/jobs')}>

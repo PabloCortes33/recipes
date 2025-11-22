@@ -14,6 +14,12 @@
   min-height: 44px;
   display: flex;
   align-items: center;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  /* Ensure full text is visible - no truncation */
+  text-overflow: clip;
+  overflow: visible;
 }
 
 @media (min-width: 768px) {

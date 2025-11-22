@@ -61,10 +61,18 @@ export const RecipeBrowser = () => {
           </div>
         </div>
         <div className="browser-header-actions">
-          <Button variant="secondary" onClick={() => navigate('/admin')}>
+          <Button 
+            variant="secondary" 
+            onClick={() => navigate('/admin')}
+            aria-label="Go to admin panel"
+          >
             ⚙️ Admin
           </Button>
-          <button className="ideas-tab-btn" onClick={() => setShowIdeas(true)}>
+          <button 
+            className="ideas-tab-btn" 
+            onClick={() => setShowIdeas(true)}
+            aria-label="Open recipe ideas"
+          >
             💡 Recipe Ideas
           </button>
         </div>

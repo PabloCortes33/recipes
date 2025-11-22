@@ -9,28 +9,37 @@ import './JobsDashboard.css';
 
 export const JobsDashboard = () => {
   const navigate = useNavigate();
-  const [jobs, setJobs] = useState({ inProgress: [], drafts: [], failed: [] });
+  const [jobs, setJobs] = useState({ pending: [], drafts: [], failed: [] });
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [expandedError, setExpandedError] = useState(null);
   const [expandedRecipe, setExpandedRecipe] = useState(null);
 
-  const loadJobs = async () => {
+  const loadJobs = async (silent = false) => {
     try {
-      setLoading(true);
+      if (silent) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       const response = await jobsAPI.list();
       setJobs(response.data);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to load jobs');
     } finally {
-      setLoading(false);
+      if (silent) {
+        setIsRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadJobs();
-    const interval = setInterval(loadJobs, 5000); // Refresh every 5 seconds
+    loadJobs(false); // Initial load - show spinner
+    const interval = setInterval(() => loadJobs(true), 5000); // Silent refresh every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -44,7 +53,7 @@ export const JobsDashboard = () => {
       const response = await recipeAPI.commit(jobId, commitMessage);
       if (response.data.success) {
         alert('✅ Recipe committed and pushed to GitHub!');
-        loadJobs();
+        loadJobs(true); // Silent refresh after commit
       } else {
         alert('❌ Error: ' + (response.data.error || 'Unknown error'));
       }
@@ -58,7 +67,7 @@ export const JobsDashboard = () => {
 
     try {
       await jobsAPI.retry(jobId);
-      loadJobs();
+      loadJobs(true); // Silent refresh after retry
     } catch (err) {
       alert('Error retrying job: ' + (err.response?.data?.error || err.message));
     }
@@ -69,7 +78,7 @@ export const JobsDashboard = () => {
 
     try {
       await jobsAPI.delete(jobId);
-      loadJobs();
+      loadJobs(true); // Silent refresh after delete
     } catch (err) {
       alert('Error deleting job: ' + (err.response?.data?.error || err.message));
     }
@@ -146,7 +155,8 @@ export const JobsDashboard = () => {
     );
   };
 
-  if (loading) {
+  // Only show full-page spinner on initial load
+  if (loading && (!jobs.pending || jobs.pending.length === 0) && (!jobs.drafts || jobs.drafts.length === 0) && (!jobs.failed || jobs.failed.length === 0)) {
     return <LoadingSpinner message="Loading jobs..." />;
   }
 
@@ -155,11 +165,15 @@ export const JobsDashboard = () => {
       <div className="dashboard-header">
         <h1>📝 Jobs Dashboard</h1>
         <div className="dashboard-actions">
-          <Button variant="secondary" onClick={() => navigate('/')}>
+          <Button variant="secondary" onClick={() => navigate('/admin')}>
             ← Back to Generator
           </Button>
-          <Button variant="primary" onClick={loadJobs}>
-            🔄 Refresh
+          <Button 
+            variant="primary" 
+            onClick={() => loadJobs(true)}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
           </Button>
         </div>
       </div>
@@ -168,11 +182,11 @@ export const JobsDashboard = () => {
 
       <div className="jobs-sections">
         <div className="jobs-section">
-          <h2>⏳ In Progress ({jobs.inProgress.length})</h2>
-          {jobs.inProgress.length === 0 ? (
+          <h2>⏳ In Progress ({jobs.pending?.length || 0})</h2>
+          {(!jobs.pending || jobs.pending.length === 0) ? (
             <p className="empty-state">No jobs in progress</p>
           ) : (
-            jobs.inProgress.map((job) => (
+            jobs.pending.map((job) => (
               <div key={job.jobId}>
                 <JobCard
                   job={job}
@@ -189,8 +203,8 @@ export const JobsDashboard = () => {
         </div>
 
         <div className="jobs-section">
-          <h2>✅ Drafts ({jobs.drafts.length})</h2>
-          {jobs.drafts.length === 0 ? (
+          <h2>✅ Drafts ({jobs.drafts?.length || 0})</h2>
+          {(!jobs.drafts || jobs.drafts.length === 0) ? (
             <p className="empty-state">No draft recipes</p>
           ) : (
             jobs.drafts.map((job) => (
@@ -210,8 +224,8 @@ export const JobsDashboard = () => {
         </div>
 
         <div className="jobs-section">
-          <h2>❌ Failed ({jobs.failed.length})</h2>
-          {jobs.failed.length === 0 ? (
+          <h2>❌ Failed ({jobs.failed?.length || 0})</h2>
+          {(!jobs.failed || jobs.failed.length === 0) ? (
             <p className="empty-state">No failed jobs</p>
           ) : (
             jobs.failed.map((job) => (

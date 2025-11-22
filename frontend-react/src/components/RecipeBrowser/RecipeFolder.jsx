@@ -2,22 +2,41 @@ import { useState } from 'react';
 import { RecipeFile } from './RecipeFile';
 import './RecipeFolder.css';
 
+/**
+ * Format folder name with proper Unicode support
+ * Fixes text truncation issues with special characters like "ñ", "á", etc.
+ */
 const formatName = (name, isSpanish = false) => {
+  if (!name) return '';
+
   const translations = {
     'bakery': 'Panadería',
     'methods': 'Métodos',
     'recipes': 'Recetas',
     'sauces': 'Salsas',
     'spices': 'Especias',
+    'english': 'English',
+    'spanish': 'Español',
   };
 
-  if (isSpanish && translations[name.toLowerCase()]) {
-    return translations[name.toLowerCase()];
+  const lowerName = name.toLowerCase();
+  
+  if (isSpanish && translations[lowerName]) {
+    return translations[lowerName];
+  }
+  
+  if (translations[lowerName]) {
+    return translations[lowerName];
   }
 
   return name
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+    .trim()
+    // Properly capitalize first letter of each word (Unicode-aware)
+    .replace(/(?:^|\s)([^\s])/g, (match, char) => {
+      return match.replace(char, char.toUpperCase());
+    });
 };
 
 export const RecipeFolder = ({ folder, isSpanish = false, level = 0 }) => {
@@ -32,6 +51,16 @@ export const RecipeFolder = ({ folder, isSpanish = false, level = 0 }) => {
       <div
         className="folder-name"
         onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${formatName(folder.name, isSpanish)} folder`}
       >
         <span className="folder-icon">{isExpanded ? '📂' : '📁'}</span>
         {formatName(folder.name, isSpanish)}
