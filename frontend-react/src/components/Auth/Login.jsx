@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
 const AUTH_TOKEN_KEY = 'recipes_admin_token';
+const AUTH_USERNAME_KEY = 'recipes_admin_username';
 
 export const Login = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,30 +18,39 @@ export const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      // Test authentication with health check (which doesn't require auth)
-      // Then try an admin endpoint
       const API_BASE_URL = import.meta.env.VITE_API_URL || '';
       
-      const response = await fetch(`${API_BASE_URL}/api/health`, {
-        method: 'GET',
+      // Call login endpoint to get JWT token
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${password}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ username, password }),
       });
 
-      // Store token in localStorage
-      localStorage.setItem(AUTH_TOKEN_KEY, password);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Invalid credentials');
+      }
+
+      const data = await response.json();
+
+      // Store JWT token and username in localStorage
+      localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+      localStorage.setItem(AUTH_USERNAME_KEY, data.username);
       
       // Call onLogin callback if provided
       if (onLogin) {
-        onLogin(password);
+        onLogin(data.token);
       }
       
       // Navigate to admin panel
       navigate('/admin');
     } catch (err) {
-      setError('Authentication failed. Please check your password.');
+      setError(err.message || 'Authentication failed. Please check your username and password.');
       localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_USERNAME_KEY);
     } finally {
       setLoading(false);
     }
@@ -49,9 +60,25 @@ export const Login = ({ onLogin }) => {
     <div className="login-container">
       <div className="login-card">
         <h1>🔒 Admin Login</h1>
-        <p className="login-subtitle">Enter your password to access the admin panel</p>
+        <p className="login-subtitle">Enter your credentials to access the admin panel</p>
         
         <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+              required
+              autoFocus
+              disabled={loading}
+              aria-label="Username"
+              autoComplete="username"
+            />
+          </div>
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -59,11 +86,11 @@ export const Login = ({ onLogin }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter admin password"
+              placeholder="Enter password"
               required
-              autoFocus
               disabled={loading}
-              aria-label="Admin password"
+              aria-label="Password"
+              autoComplete="current-password"
             />
           </div>
 
@@ -76,7 +103,7 @@ export const Login = ({ onLogin }) => {
           <button
             type="submit"
             className="login-button"
-            disabled={loading || !password.trim()}
+            disabled={loading || !username.trim() || !password.trim()}
             aria-label="Submit login"
           >
             {loading ? 'Logging in...' : 'Login'}
@@ -92,8 +119,13 @@ export const getAuthToken = () => {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 };
 
+// Export function to get username
+export const getUsername = () => {
+  return localStorage.getItem(AUTH_USERNAME_KEY);
+};
+
 // Export function to clear auth token
 export const clearAuthToken = () => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USERNAME_KEY);
 };
-

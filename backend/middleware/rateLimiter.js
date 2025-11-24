@@ -83,14 +83,21 @@ const rateLimiters = {
     max: 50, // 50 requests per 15 minutes
     message: 'Too many admin requests. Please slow down.'
   }),
-  
+
+  // Lenient limit for jobs polling endpoint (allows frequent polling)
+  jobsPolling: createRateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300, // 300 requests per 15 minutes (supports 5-second polling)
+    message: 'Too many jobs requests. Please slow down polling.'
+  }),
+
   // Moderate limit for recipe generation
   recipeGeneration: createRateLimiter({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 20, // 20 recipe generations per hour
     message: 'Too many recipe generation requests. Please wait before generating more recipes.'
   }),
-  
+
   // Lenient limit for public endpoints
   public: createRateLimiter({
     windowMs: 15 * 60 * 1000, // 15 minutes

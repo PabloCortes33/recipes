@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { StatusMessage } from '../common/StatusMessage';
 import { useRecipeGeneration } from '../../hooks/useRecipeGeneration';
 import { recipeAPI } from '../../services/api';
+import { clearAuthToken, getUsername } from '../Auth/Login';
 import './RecipeGenerator.css';
 
 export const RecipeGenerator = () => {
@@ -63,6 +64,11 @@ export const RecipeGenerator = () => {
     }
   };
 
+  const handleLogout = () => {
+    clearAuthToken();
+    window.location.href = 'https://numves.com';
+  };
+
   const getPromptLabel = () => {
     return mode === 'create'
       ? 'What recipe would you like to create?'
@@ -90,13 +96,19 @@ export const RecipeGenerator = () => {
   return (
     <div className="recipe-generator">
       <div className="generator-header">
-        <h1>🍳 AI Recipe Generator</h1>
+        <div>
+          <h1>🍳 AI Recipe Generator</h1>
+          <div className="user-info">👤 {getUsername() || 'Admin'}</div>
+        </div>
         <div className="header-actions">
-          <Button variant="secondary" onClick={() => navigate('/')}>
+          <Button variant="secondary" onClick={() => navigate('/browse')}>
             📚 Browse Recipes
           </Button>
           <Button variant="secondary" onClick={() => navigate('/jobs')}>
             📝 View Jobs
+          </Button>
+          <Button variant="secondary" onClick={handleLogout}>
+            🚪 Logout
           </Button>
         </div>
       </div>

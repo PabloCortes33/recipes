@@ -1,7 +1,7 @@
 import { Button } from '../common/Button';
 import './JobCard.css';
 
-export const JobCard = ({ job, onView, onCommit, onRetry, onDelete, onViewError }) => {
+export const JobCard = ({ job, onView, onCommit, onRetry, onDelete, onViewError, onRefine, onStartReview, onReturnToDrafts }) => {
   const formatTimeAgo = (dateString) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
@@ -62,6 +62,21 @@ export const JobCard = ({ job, onView, onCommit, onRetry, onDelete, onViewError 
             <Button variant="primary" className="btn-small" onClick={() => onView(job.jobId)}>
               👁️ View Recipe
             </Button>
+            {onRefine && (
+              <Button variant="secondary" className="btn-small" onClick={onRefine}>
+                ✨ Refine
+              </Button>
+            )}
+            {onStartReview && (
+              <Button variant="secondary" className="btn-small" onClick={() => onStartReview(job.jobId)}>
+                🔍 Start Review
+              </Button>
+            )}
+            {onReturnToDrafts && (
+              <Button variant="secondary" className="btn-small" onClick={() => onReturnToDrafts(job.jobId)}>
+                ← Return to Drafts
+              </Button>
+            )}
             <Button variant="success" className="btn-small" onClick={() => onCommit(job.jobId)}>
               ✅ Commit & Push
             </Button>

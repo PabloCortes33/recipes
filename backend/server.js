@@ -10,7 +10,7 @@ const execPromise = promisify(exec);
 require('dotenv').config();
 
 // Import middleware
-const { authenticate } = require('./middleware/auth');
+const { authenticate, login } = require('./middleware/auth');
 const { rateLimiters } = require('./middleware/rateLimiter');
 const { helmet } = require('./middleware/security');
 const { validateRecipeGeneration, validateCommit, validateRecipePath } = require('./middleware/validation');
@@ -35,6 +35,7 @@ const git = simpleGit(REPO_PATH);
 const initJobsDirectories = async () => {
   await fs.mkdir(path.join(JOBS_PATH, 'pending'), { recursive: true });
   await fs.mkdir(path.join(JOBS_PATH, 'completed'), { recursive: true });
+  await fs.mkdir(path.join(JOBS_PATH, 'reviewing'), { recursive: true });
   await fs.mkdir(path.join(JOBS_PATH, 'failed'), { recursive: true });
   await fs.mkdir(path.join(JOBS_PATH, 'committed'), { recursive: true });
 };
@@ -70,7 +71,7 @@ app.use('/api/recipes/file', rateLimiters.public);
 
 // Helper: Read job from disk
 const readJob = async (jobId) => {
-  const folders = ['pending', 'completed', 'failed', 'committed'];
+  const folders = ['pending', 'completed', 'reviewing', 'failed', 'committed'];
   for (const folder of folders) {
     try {
       const jobPath = path.join(JOBS_PATH, folder, `${jobId}.json`);
@@ -101,7 +102,7 @@ const moveJob = async (jobId, fromFolder, toFolder) => {
 
 // Helper: Delete job
 const deleteJob = async (jobId) => {
-  const folders = ['pending', 'completed', 'failed', 'committed'];
+  const folders = ['pending', 'completed', 'reviewing', 'failed', 'committed'];
   for (const folder of folders) {
     try {
       const jobPath = path.join(JOBS_PATH, folder, `${jobId}.json`);
@@ -351,6 +352,32 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Login endpoint - generates JWT token
+app.post('/api/login', rateLimiters.public, asyncHandler(async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ 
+      error: 'Username and password required' 
+    });
+  }
+
+  const result = login(username, password);
+
+  if (!result.success) {
+    return res.status(401).json({ 
+      error: result.error 
+    });
+  }
+
+  res.json({
+    success: true,
+    token: result.token,
+    username: result.username,
+    expiresIn: '24h'
+  });
+}));
+
 // Get recipe manifest/structure
 app.get('/api/recipes/manifest', asyncHandler(async (req, res) => {
   // Generate recipe structure manifest dynamically
@@ -433,7 +460,7 @@ app.get('/api/recipes/file/:path(*)', validateRecipePath, asyncHandler(async (re
 // Admin routes - require authentication and rate limiting
 app.use('/api/generate-recipe', authenticate, rateLimiters.recipeGeneration);
 app.use('/api/job', authenticate, rateLimiters.admin);
-app.use('/api/jobs', authenticate, rateLimiters.admin);
+app.use('/api/jobs', authenticate, rateLimiters.jobsPolling); // Lenient limit for polling
 app.use('/api/git', authenticate, rateLimiters.admin);
 app.use('/api/save-recipe', authenticate, rateLimiters.admin);
 
@@ -499,15 +526,17 @@ app.get('/api/jobs', asyncHandler(async (req, res) => {
     }
   };
 
-  const [pending, completed, failed] = await Promise.all([
+  const [pending, completed, reviewing, failed] = await Promise.all([
     readJobsFromFolder('pending'),
     readJobsFromFolder('completed'),
+    readJobsFromFolder('reviewing'),
     readJobsFromFolder('failed')
   ]);
 
   res.json({
     pending,
     drafts: completed, // completed = drafts (not yet committed)
+    reviewing, // jobs currently being reviewed/tested
     failed
   });
 }));
@@ -527,8 +556,8 @@ app.post('/api/job/:jobId/commit', validateCommit, asyncHandler(async (req, res)
     throw err;
   }
   
-  if (job.folder !== 'completed') {
-    const err = new Error(`Job is not completed. Current status: ${job.folder}`);
+  if (job.folder !== 'completed' && job.folder !== 'reviewing') {
+    const err = new Error(`Job is not in a committable state. Current status: ${job.folder}`);
     err.statusCode = 400;
     throw err;
   }
@@ -600,7 +629,7 @@ app.post('/api/job/:jobId/commit', validateCommit, asyncHandler(async (req, res)
     console.error('[Commit] Git push failed:', pushError);
     console.error('[Commit] Push error details:', pushError.message);
     // Don't fail the whole operation if push fails - recipe is still committed
-    await moveJob(jobId, 'completed', 'committed');
+    await moveJob(jobId, job.folder, 'committed');
     return res.json({
       success: true,
       message: 'Recipe committed locally. Push to GitHub failed - you can push manually.',
@@ -609,7 +638,7 @@ app.post('/api/job/:jobId/commit', validateCommit, asyncHandler(async (req, res)
   }
 
   // Move job to committed
-  await moveJob(jobId, 'completed', 'committed');
+  await moveJob(jobId, job.folder, 'committed');
 
   res.json({
     success: true,
@@ -648,6 +677,7 @@ app.post('/api/job/:jobId/refine', async (req, res) => {
     const refineJobData = {
       jobId: refineJobId,
       prompt: refinementPrompt,
+      refinementPrompt: refinementPrompt, // Add this for processRefinement
       mode: 'refine',
       originalJobId: jobId,
       originalRecipes: job.recipes,
@@ -683,13 +713,54 @@ app.post('/api/job/:jobId/refine', async (req, res) => {
 const processRefinement = async (jobId, jobData) => {
   try {
     const { refinementPrompt, originalRecipes } = jobData;
-    
-    // Update status: Refining
+
+    let researchContext = '';
+
+    // Step 1: Research with Gemini
+    try {
+      jobData.status = 'researching';
+      jobData.progress = 'Researching refinement with Gemini...';
+      await writeJob(jobId, jobData, 'pending');
+
+      const researchPrompt = `Research the following recipe refinement request and provide detailed information that will help improve the recipe:\n\n${refinementPrompt}\n\nProvide specific details about:\n- Techniques or ingredients mentioned in the refinement\n- Traditional or modern approaches to the requested changes\n- Cultural context if relevant\n- Cooking methods and tips related to the refinement\n- Ingredient alternatives or substitutions if applicable\n- Any other relevant information to make this refinement successful`;
+      const escapedResearchPrompt = researchPrompt.replace(/'/g, "'\\''");
+
+      // Prepare environment for Claude Code CLI
+      const claudeEnv = {
+        ...process.env,
+        HOME: process.env.HOME || '/home/pablo',
+        USER: process.env.USER || 'pablo',
+        PATH: process.env.PATH || '/home/pablo/.nvm/versions/node/v20.19.5/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      };
+      delete claudeEnv.ANTHROPIC_API_KEY;
+
+      const { stdout, stderr } = await execPromise(`unbuffer ${CLAUDE_PATH} --dangerously-skip-permissions -p '@gemini-research-expert ${escapedResearchPrompt}'`, {
+        timeout: 600000,
+        cwd: REPO_PATH,
+        env: claudeEnv
+      });
+
+      if (stderr) console.error('Research stderr:', stderr);
+      researchContext = stdout.trim();
+      console.log(`[Refine ${jobId}] Research completed`);
+
+      jobData.researchContext = researchContext;
+      await writeJob(jobId, jobData, 'pending');
+    } catch (error) {
+      console.error(`[Refine ${jobId}] Research failed:`, error.message);
+      researchContext = '';
+    }
+
+    // Step 2: Refine with Claude using research context
     jobData.status = 'refining';
     jobData.progress = 'Refining recipe with Claude CLI...';
     await writeJob(jobId, jobData, 'pending');
-    
-    // Build refinement prompt
+
+    // Build refinement prompt with research context
+    const refinementInstructions = researchContext
+      ? `Based on this research:\n\n${researchContext}\n\n---\n\n${refinementPrompt}`
+      : refinementPrompt;
+
     const refinePrompt = `I have an existing recipe that I want to refine. Here is the current recipe:
 
 ===CURRENT ENGLISH RECIPE===
@@ -699,7 +770,7 @@ ${originalRecipes.english.content}
 ${originalRecipes.spanish.content}
 
 ===REFINEMENT REQUEST===
-${refinementPrompt}
+${refinementInstructions}
 
 IMPORTANT: Generate TWO refined versions of the recipe in markdown format (English and Spanish).
 
@@ -793,6 +864,7 @@ Do not add any other text before or after this format. Just output the refined r
         ...(originalJob?.refinementHistory || []),
         {
           prompt: refinementPrompt,
+          researchContext: researchContext,
           refinedAt: new Date().toISOString()
         }
       ]
@@ -915,6 +987,58 @@ app.post('/api/job/:jobId/retry', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Start reviewing a draft (move from completed to reviewing)
+app.post('/api/job/:jobId/start-review', asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const job = await readJob(jobId);
+
+  if (!job) {
+    const err = new Error('Job not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (job.folder !== 'completed') {
+    const err = new Error(`Job is not in drafts. Current status: ${job.folder}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Move job to reviewing
+  await moveJob(jobId, 'completed', 'reviewing');
+
+  res.json({
+    success: true,
+    message: 'Job moved to reviewing'
+  });
+}));
+
+// Return to drafts (move from reviewing to completed)
+app.post('/api/job/:jobId/return-to-drafts', asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+  const job = await readJob(jobId);
+
+  if (!job) {
+    const err = new Error('Job not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (job.folder !== 'reviewing') {
+    const err = new Error(`Job is not being reviewed. Current status: ${job.folder}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Move job back to completed
+  await moveJob(jobId, 'reviewing', 'completed');
+
+  res.json({
+    success: true,
+    message: 'Job returned to drafts'
+  });
+}));
 
 // Legacy endpoints for backward compatibility
 

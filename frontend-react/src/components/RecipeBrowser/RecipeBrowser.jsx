@@ -63,7 +63,7 @@ export const RecipeBrowser = () => {
         <div className="browser-header-actions">
           <Button 
             variant="secondary" 
-            onClick={() => navigate('/admin')}
+            onClick={() => window.location.href = 'https://dash.numves.com'}
             aria-label="Go to admin panel"
           >
             ⚙️ Admin

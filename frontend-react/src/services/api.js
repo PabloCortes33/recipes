@@ -65,14 +65,18 @@ export const recipeAPI = {
 // Jobs API
 export const jobsAPI = {
   list: () => api.get('/api/jobs'),
-  
+
   get: (jobId) => api.get(`/api/job/${jobId}`),
-  
+
   delete: (jobId) => api.delete(`/api/job/${jobId}`),
-  
+
   retry: (jobId) => api.post(`/api/job/${jobId}/retry`),
-  
+
   cancel: (jobId) => api.post(`/api/job/${jobId}/cancel`),
+
+  startReview: (jobId) => api.post(`/api/job/${jobId}/start-review`),
+
+  returnToDrafts: (jobId) => api.post(`/api/job/${jobId}/return-to-drafts`),
 };
 
 // Git API

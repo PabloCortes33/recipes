@@ -29,6 +29,12 @@
   padding-bottom: 0.5em;
 }
 
+.user-info {
+  color: #666;
+  font-size: 0.9em;
+  margin-top: 0.3em;
+}
+
 .generator-form {
   margin-top: 2em;
 }

@@ -18,6 +18,12 @@
   color: #333;
 }
 
+.user-info {
+  color: #666;
+  font-size: 0.9em;
+  margin-top: 0.3em;
+}
+
 .dashboard-actions {
   display: flex;
   gap: 0.5em;
@@ -102,5 +108,12 @@
   overflow-x: auto;
   font-size: 0.9em;
   white-space: pre-wrap;
+}
+
+.recipe-preview-expanded pre.recipe-content {
+  max-height: 600px;
+  overflow-y: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
