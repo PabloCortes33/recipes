@@ -1,19 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JobsTable } from './JobsTable';
+import { JobsMobileView } from './JobsMobileView';
 import { Button } from '../common/Button';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { StatusMessage } from '../common/StatusMessage';
 import { jobsAPI, recipeAPI } from '../../services/api';
 import { clearAuthToken, getUsername } from '../Auth/Login';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button as MuiButton,
+  Typography,
+  Box,
+  Divider,
+  Chip,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
 import './JobsDashboard.css';
 
 export const JobsDashboard = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Mobile if screen < 900px
+
   const [jobs, setJobs] = useState({ pending: [], drafts: [], reviewing: [], failed: [] });
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  // Dialog states
+  const [recipeDialogOpen, setRecipeDialogOpen] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [selectedError, setSelectedError] = useState(null);
 
   const loadJobs = async (silent = false) => {
     try {
@@ -135,15 +158,8 @@ export const JobsDashboard = () => {
     try {
       const response = await jobsAPI.get(jobId);
       const job = response.data;
-
-      // Format error details
-      let errorMsg = `Error Details for Job #${jobId}\n\n`;
-      errorMsg += `Error: ${job.error || 'No error message'}\n\n`;
-      if (job.errorStderr) errorMsg += `Stderr:\n${job.errorStderr}\n\n`;
-      if (job.errorStdout) errorMsg += `Stdout:\n${job.errorStdout}\n\n`;
-      if (job.errorStack) errorMsg += `Stack:\n${job.errorStack}\n`;
-
-      alert(errorMsg);
+      setSelectedError(job);
+      setErrorDialogOpen(true);
     } catch (err) {
       alert('Error loading error details: ' + err.message);
     }
@@ -159,18 +175,8 @@ export const JobsDashboard = () => {
         return;
       }
 
-      // Format recipe preview
-      let recipeMsg = `Recipe Preview for Job #${jobId}\n\n`;
-      if (job.recipes.english) {
-        recipeMsg += `🇬🇧 English: ${job.recipes.english.filename}\n\n`;
-        recipeMsg += `${job.recipes.english.content.substring(0, 500)}...\n\n`;
-      }
-      if (job.recipes.spanish) {
-        recipeMsg += `🇪🇸 Spanish: ${job.recipes.spanish.filename}\n\n`;
-        recipeMsg += `${job.recipes.spanish.content.substring(0, 500)}...\n`;
-      }
-
-      alert(recipeMsg);
+      setSelectedRecipe(job);
+      setRecipeDialogOpen(true);
     } catch (err) {
       alert('Error loading recipe: ' + err.message);
     }
@@ -210,18 +216,245 @@ export const JobsDashboard = () => {
 
       {error && <StatusMessage type="error" message={error} />}
 
-      {/* Jobs Table */}
-      <JobsTable
-        jobs={jobs}
-        onView={handleViewRecipe}
-        onCommit={handleCommit}
-        onRetry={handleRetry}
-        onDelete={handleDelete}
-        onRefine={handleRefine}
-        onStartReview={handleStartReview}
-        onReturnToDrafts={handleReturnToDrafts}
-        onViewError={handleViewError}
-      />
+      {/* Responsive View: Table for desktop, Cards for mobile */}
+      {isMobile ? (
+        <JobsMobileView
+          jobs={jobs}
+          onView={handleViewRecipe}
+          onCommit={handleCommit}
+          onRetry={handleRetry}
+          onDelete={handleDelete}
+          onRefine={handleRefine}
+          onStartReview={handleStartReview}
+          onReturnToDrafts={handleReturnToDrafts}
+          onViewError={handleViewError}
+        />
+      ) : (
+        <JobsTable
+          jobs={jobs}
+          onView={handleViewRecipe}
+          onCommit={handleCommit}
+          onRetry={handleRetry}
+          onDelete={handleDelete}
+          onRefine={handleRefine}
+          onStartReview={handleStartReview}
+          onReturnToDrafts={handleReturnToDrafts}
+          onViewError={handleViewError}
+        />
+      )}
+
+      {/* Recipe Preview Dialog */}
+      <Dialog
+        open={recipeDialogOpen}
+        onClose={() => setRecipeDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            Recipe Preview
+            {selectedRecipe && (
+              <Chip label={`Job #${selectedRecipe.jobId}`} size="small" color="primary" />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedRecipe && selectedRecipe.recipes && (
+            <Box>
+              {/* English Recipe */}
+              {selectedRecipe.recipes.english && (
+                <Box sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Typography variant="h6" component="h3">
+                      🇬🇧 English
+                    </Typography>
+                    <Chip
+                      label={selectedRecipe.recipes.english.filename}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Box
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.50',
+                      borderRadius: 1,
+                      maxHeight: 400,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {selectedRecipe.recipes.english.content}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Divider */}
+              {selectedRecipe.recipes.english && selectedRecipe.recipes.spanish && (
+                <Divider sx={{ my: 3 }} />
+              )}
+
+              {/* Spanish Recipe */}
+              {selectedRecipe.recipes.spanish && (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Typography variant="h6" component="h3">
+                      🇪🇸 Spanish
+                    </Typography>
+                    <Chip
+                      label={selectedRecipe.recipes.spanish.filename}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Box
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.50',
+                      borderRadius: 1,
+                      maxHeight: 400,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {selectedRecipe.recipes.spanish.content}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={() => setRecipeDialogOpen(false)}>Close</MuiButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Details Dialog */}
+      <Dialog
+        open={errorDialogOpen}
+        onClose={() => setErrorDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            Error Details
+            {selectedError && (
+              <Chip label={`Job #${selectedError.jobId}`} size="small" color="error" />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedError && (
+            <Box>
+              {/* Error Message */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Error Message
+                </Typography>
+                <Box
+                  sx={{
+                    p: 2,
+                    bgcolor: 'error.light',
+                    color: 'error.contrastText',
+                    borderRadius: 1,
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  {selectedError.error || 'No error message'}
+                </Box>
+              </Box>
+
+              {/* Stderr */}
+              {selectedError.errorStderr && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Standard Error (stderr)
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.100',
+                      borderRadius: 1,
+                      maxHeight: 200,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {selectedError.errorStderr}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Stdout */}
+              {selectedError.errorStdout && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Standard Output (stdout)
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.100',
+                      borderRadius: 1,
+                      maxHeight: 200,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {selectedError.errorStdout}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Stack Trace */}
+              {selectedError.errorStack && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Stack Trace
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.100',
+                      borderRadius: 1,
+                      maxHeight: 200,
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    {selectedError.errorStack}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Exit Code */}
+              {selectedError.errorCode !== null && selectedError.errorCode !== undefined && (
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Exit Code
+                  </Typography>
+                  <Chip label={selectedError.errorCode} color="error" />
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={() => setErrorDialogOpen(false)}>Close</MuiButton>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
